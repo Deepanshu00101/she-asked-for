@@ -1,0 +1,2742 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0A0608" />
+  <title>For Kanu</title>
+
+  <!--
+    ============================================================================
+    FOR KANU — a cinematic proposal experience
+    ----------------------------------------------------------------------------
+    THEME : dark romantic · deep wine on warm near-black · film grain · ember glow
+    VIEW  : mobile-first, tuned at 390×844; 100dvh, scroll-locked stage
+    STACK : vanilla JS + GSAP (CDN) · single-file artifact · no build step
+    ----------------------------------------------------------------------------
+    ARCHITECTURE
+      .stage                fixed, full-viewport cinematic frame (scroll-locked)
+        .stage__atmosphere  ambient layer (vignette, glow, ember dust, grain)
+        .stage__hud         film-slate corners (FOR KANU / SC.01)
+        .stage__content     the scene's composed content block
+        .stage__stamp       bottom filmic citation
+        .stage__hit         full-bleed tap surface (semantic <button>)
+
+    SCENES
+      Scenes register with window.Kanu.registerScene(id, {mount, play, exit}).
+      Only Scene 1 (intro) is implemented; seams for 2–8 are stubbed. The stage is
+      dark and empty beneath the intro — each scene owns its content.
+
+    COPY
+      Scene-1 copy is treated as illustrative ("such as...") and is typeset as an
+      editorial opener. Scene 7's message is VERBATIM and must never be rewritten.
+    ============================================================================
+  -->
+  <meta name="description" content="A cinematic proposal experience, made by hand for one person." />
+
+  <!-- Fonts (premium editorial voice: Fraunces for emotional display, Inter for chrome) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,200..500,0..100,0..1;1,9..144,200..500,0..100,0..1&family=Inter:wght@300;400;500;600&display=swap" />
+
+  <style>
+  /* ============================================================================
+     1. DESIGN TOKENS
+     The whole experience inherits from these. Change a token, the film changes.
+     ============================================================================ */
+  :root {
+    /* — surfaces (warm near-black, not pure #000 — the warmth is the premium cue) */
+    --ink:        #0A0608;              /* stage base                      */
+    --ink-deep:   #060304;              /* receding depths                 */
+    --ink-lift:   #150E11;              /* slightly raised surface         */
+
+    /* — text (warm cream, never cold white / generic grey) */
+    --cream:       #F4EAE4;
+    --cream-soft:  rgba(244, 234, 228, 0.62);
+    --cream-faint: rgba(244, 234, 228, 0.40);
+    --cream-ruler: rgba(244, 234, 228, 0.38);
+    --cream-mid:   rgba(244, 234, 228, 0.48);
+
+    /* — the romantic spectrum (wine → ember, desaturated & grown-up) */
+    --wine-deep:   #3C0E1E;
+    --wine:        #7A1E3D;
+    --wine-bright: #A1324F;
+    --ember:       #E2545F;             /* the one hot accent, used sparingly */
+
+    /* — type */
+    --font-display: 'Fraunces', 'Times New Roman', serif;
+    --font-body:    'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --fs-display: clamp(26px, 7vw, 34px);     /* main emotional line — tuned for 320-390 */
+    --fs-label:   11px;
+    --fs-hud:     10px;
+    --fs-stamp:   10px;
+    --dur-fast:   180ms;
+
+    /* — spacing (4px rhythm; generous by design) */
+    --sp-1:  4px;
+    --sp-2:  8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    --sp-12: 48px;
+    --sp-16: 64px;
+    --sp-20: 80px;
+
+    /* — motion */
+    --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-quad:   cubic-bezier(0.55, 0.085, 0.68, 0.53);
+    --dur-micro:    120ms;
+    --dur-short:    260ms;
+    --dur-med:      520ms;
+    --dur-long:     900ms;
+
+    /* — safe areas */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ============================================================================
+     2. BASE
+     ============================================================================ */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--font-body);
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  /* address-bar resize on Android causes 100dvh jank — lock with visualViewport */
+  html { scrollbar-gutter: stable; }
+
+  ::selection { background: rgba(226, 84, 95, 0.28); color: var(--cream); }
+
+  /* — a11y: screen-reader only + skip link */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  .skip-link {
+    position: absolute; left: 12px; top: 12px; z-index: 20;
+    background: var(--ink); color: var(--cream);
+    padding: 8px 14px; border-radius: 999px;
+    border: 1px solid rgba(244,234,228,0.16);
+    font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+    text-decoration: none;
+    transform: translateY(-150%); opacity: 0;
+    transition: transform 180ms var(--ease-out-quint), opacity 180ms ease;
+  }
+  .skip-link:focus-visible { transform: translateY(0); opacity: 1; }
+  /* when :focus-visible unsupported, still show on focus */
+  .skip-link:focus { transform: translateY(0); opacity: 1; }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ============================================================================
+     3. THE STAGE
+     One fixed cinematic frame. Content is composed per-scene above a shared
+     atmosphere (glow, ember dust, grain) so every scene reads as the same film.
+     ============================================================================ */
+  .stage {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100vh;                       /* fallback — then svh, then dvh */
+    height: 100dvh;                      /* Chrome / Android address bar — dynamic */
+    height: var(--app-vh, 100dvh);       /* visualViewport override when JS sets --app-vh */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--ink);
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    /* Android: never let the fixed frame create a sideways scroll */
+    overscroll-behavior: none;
+  }
+  @supports (height: 100svh) {
+    .stage { height: 100svh; height: 100dvh; height: var(--app-vh, 100dvh); }
+  }
+
+  /* Vignette — reinforces the center, recedes the edges of the frame */
+  .stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      radial-gradient(
+        125% 125% at 50% 42%,
+        transparent 58%,
+        rgba(0, 0, 0, 0.42) 100%
+      );
+    pointer-events: none;
+  }
+
+  /* Film grain — the layer that stops the screen from feeling digital */
+  .stage::after {
+    content: "";
+    position: absolute;
+    inset: -60px;
+    z-index: 8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 240px 240px;
+    mix-blend-mode: overlay;
+    opacity: 0.18;
+    pointer-events: none;
+    animation: grain-shift 1.3s steps(1, end) infinite;
+    contain: strict;
+  }
+  @media (max-width: 380px) {
+    .stage::after { opacity: 0.12; }
+  }
+
+  @keyframes grain-shift {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    20%      { transform: translate3d(-20px, 12px, 0); }
+    40%      { transform: translate3d(14px, -16px, 0); }
+    60%      { transform: translate3d(-10px, -12px, 0); }
+    80%      { transform: translate3d(18px, 14px, 0); }
+  }
+
+  /* ============================================================================
+     4. ATMOSPHERE
+     ============================================================================ */
+  .stage__atmosphere {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Ember glow — a barely-there ember breathing low behind the frame */
+  .stage__glow {
+    position: absolute;
+    left: 50%;
+    top: 54%;
+    width: 120%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      closest-side,
+      rgba(226, 84, 95, 0.16),
+      rgba(122, 30, 61, 0.08) 45%,
+      transparent 72%
+    );
+    filter: blur(6px);
+    animation: glow-breath 6.5s var(--ease-in-quad) infinite;
+    will-change: transform, opacity;
+    contain: layout style;
+  }
+
+  @keyframes glow-breath {
+    0%, 100% { opacity: 0.8;  transform: translate(-50%, -50%) scale(1); }
+    50%      { opacity: 1;    transform: translate(-50%, -50%) scale(1.04); }
+  }
+
+  /* Ember dust — a few hot flecks drifting up through the light */
+  .stage__embers {
+    position: absolute;
+    inset: 0;
+  }
+
+  .ember {
+    position: absolute;
+    left: var(--x, 50%);
+    top: 100%;
+    width: var(--size, 2px);
+    height: var(--size, 2px);
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--ember), var(--wine-bright) 70%, transparent 100%);
+    opacity: var(--o, 0.4);
+    filter: blur(0.5px);
+    animation: ember-rise var(--dur, 18s) linear var(--delay, 0s) infinite;
+    will-change: transform;
+  }
+
+  @keyframes ember-rise {
+    0%   { transform: translate3d(0, 0, 0); }
+    50%  { transform: translate3d(var(--sway, 14px), -58vh, 0); }
+    100% { transform: translate3d(0, -116vh, 0); }
+  }
+
+  /* ============================================================================
+     5. STAGE CHROME (HUD · STAMP)
+     Filmic slate call-outs framing the scene — set dressing, not interface.
+     ============================================================================ */
+  .stage__hud {
+    position: absolute;
+    top: calc(var(--sat) + var(--sp-4));
+    left: 0;
+    right: 0;
+    z-index: 4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 0 max(14px, 22px);
+    font-size: var(--fs-hud);
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    opacity: 0;                          /* revealed by the intro timeline */
+  }
+  .stage__hud span { white-space: nowrap; }
+
+  .stage__hud .rec {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 7px;
+    border-radius: 50%;
+    background: var(--ember);
+    vertical-align: 1px;
+    animation: rec-blink 3s steps(1, end) infinite;
+  }
+
+  @keyframes rec-blink {
+    0%, 88%, 100% { opacity: 0.9; }
+    92%           { opacity: 0.25; }
+  }
+
+  .stage__stamp {
+    position: absolute;
+    bottom: calc(var(--sab) + var(--sp-4));
+    left: 0;
+    right: 0;
+    z-index: 4;
+    text-align: center;
+    font-size: var(--fs-stamp);
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    color: var(--cream-faint);
+    opacity: 0;                          /* revealed by the intro timeline */
+  }
+
+  /* ============================================================================
+     6. SCENE 1 — INTRO
+     "I made something for you..." → "Tap to begin →"
+     A single composed line, a hairline rule, a quiet call to action.
+     ============================================================================ */
+  .stage__content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0 20px;
+    /* slightly above true center so the CTA below lands on the optical center */
+    transform: translateY(-22px);
+  }
+
+  .intro__line {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-variation-settings: "SOFT" 28, "WONK" 0;
+    font-optical-sizing: auto;
+    font-size: var(--fs-display);
+    line-height: 1.34;
+    letter-spacing: -0.01em;
+    max-width: 15.5em;
+    text-wrap: balance;
+  }
+
+  .intro__word {
+    display: inline-block;
+    white-space: pre;
+    opacity: 0;
+    transform: translateY(18px);
+    will-change: transform, opacity;
+  }
+
+  .intro__word.is-em {
+    font-style: italic;
+    font-variation-settings: "SOFT" 100, "WONK" 1;
+    color: var(--cream-soft);
+  }
+
+  /* The CTA group: hairline rule + letter-spaced label + drift arrow */
+  .intro__cta {
+    margin-top: var(--sp-12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    opacity: 0;
+  }
+
+  .intro__rule {
+    width: 64px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cream-ruler), transparent);
+    transform: scaleX(0);
+    transform-origin: center;
+    will-change: transform;
+  }
+
+  .intro__label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--fs-label);
+    font-weight: 500;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--cream-soft);
+    transition: transform var(--dur-micro) ease, color var(--dur-fast) ease;
+  }
+
+  .intro__label-arrow {
+    font-size: 14px;
+    line-height: 1;
+    letter-spacing: 0;
+    color: var(--ember);
+    animation: arrow-nudge 2.6s ease-in-out 1s infinite;
+  }
+
+  @keyframes arrow-nudge {
+    0%, 100% { transform: translateX(0);    opacity: 0.5; }
+    50%      { transform: translateX(4px);  opacity: 1;   }
+  }
+
+  /* tactile press feedback on the whole scene */
+  .stage.is-pressing .intro__label { transform: scale(0.96); }
+
+  /* once settled, the whole opener breathes very slowly */
+  .stage.is-settled .stage__content {
+    animation: scene-breathe 9s ease-in-out infinite alternate;
+  }
+
+  @keyframes scene-breathe {
+    from { transform: translateY(-22px) scale(1); }
+    to   { transform: translateY(-22px) scale(1.008); }
+  }
+
+  /* ============================================================================
+     7. SCENES 2–4 — THE STORY + THE QUESTION
+     Shared container; each scene crossfades inside one locked frame.
+     Inter-scene cuts are handled by a GSAP overlay, never by navigation.
+     ============================================================================ */
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .scene.is-active { pointer-events: auto; }
+  /* only the active scene should sit above the hit layer */
+  .scene:not(.is-active) { z-index: 1; }
+
+  /* transition veil between scenes (a tiny editorial cut) */
+  .stage__veil {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    background: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ── Scene 2: our story ─────────────────────────────────────────────── */
+  .story {
+    gap: 0;
+    text-align: center;
+    transform: translateY(-10px);
+  }
+  .story__line {
+    font-family: var(--font-display);
+    font-weight: 340;
+    font-variation-settings: "SOFT" 100, "WONK" 0;
+    font-optical-sizing: auto;
+    font-size: clamp(21px, 5.8vw, 27px);
+    line-height: 1.30;
+    letter-spacing: 0.004em;
+    color: var(--cream);
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+    text-wrap: balance;
+  }
+  .story__line.is-date {
+    font-size: 11px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    margin-bottom: var(--sp-8);
+  }
+  .story__line.is-soft {
+    font-style: italic;
+    font-variation-settings: "SOFT" 100, "WONK" 1;
+    color: var(--cream-soft);
+    font-size: clamp(20px, 5.4vw, 25px);
+  }
+  .story__line.is-closing {
+    font-size: clamp(22px, 6vw, 28px);
+    margin-top: var(--sp-6);
+    color: var(--cream);
+  }
+  .story__rule {
+    width: 28px;
+    height: 1px;
+    margin: var(--sp-6) auto 0;
+    background: linear-gradient(90deg, transparent, var(--cream-ruler), transparent);
+    opacity: 0;
+    transform: scaleX(0.6);
+  }
+  .story__hint {
+    margin-top: var(--sp-12);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    opacity: 0;
+  }
+
+  /* ── Scene 3: build-up ──────────────────────────────────────────────── */
+  .buildup {
+    gap: 0;
+    text-align: center;
+    transform: translateY(-12px);
+  }
+  .buildup__name {
+    font-family: var(--font-display);
+    font-weight: 380;
+    font-variation-settings: "SOFT" 32, "WONK" 0;
+    font-optical-sizing: auto;
+    font-size: clamp(40px, 11vw, 54px);
+    letter-spacing: -0.018em;
+    line-height: 0.98;
+    color: var(--cream);
+    opacity: 0;
+    transform: scale(0.96);
+    filter: blur(10px);
+    text-shadow: 0 1px 14px rgba(122,30,61,0.12);
+    text-wrap: balance;
+  }
+  .buildup__name::after {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 1px;
+    margin: var(--sp-4) auto 0;
+    background: linear-gradient(90deg, transparent, rgba(226,84,95,0.35), transparent);
+    opacity: 0;
+  }
+  .buildup__line {
+    margin-top: var(--sp-8);
+    font-family: var(--font-display);
+    font-weight: 340;
+    font-variation-settings: "SOFT" 100, "WONK" 0;
+    font-size: clamp(19px, 5.2vw, 24px);
+    line-height: 1.35;
+    letter-spacing: 0.004em;
+    color: var(--cream-soft);
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+  .buildup__hint {
+    margin-top: var(--sp-12);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    opacity: 0;
+  }
+
+  /* ── Scene 4: the question ──────────────────────────────────────────── */
+  .proposal {
+    gap: 0;
+    text-align: center;
+    transform: translateY(-18px);
+  }
+  .proposal__eyebrow {
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    opacity: 0;
+    margin-bottom: var(--sp-4);
+    text-indent: 0.32em;
+  }
+  .proposal__question {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-variation-settings: "SOFT" 28, "WONK" 0;
+    font-optical-sizing: auto;
+    font-size: clamp(30px, 8.6vw, 40px);
+    line-height: 1.06;
+    letter-spacing: -0.012em;
+    color: var(--cream);
+    text-shadow: 0 1px 12px rgba(122,30,61,0.10), 0 1px 0 rgba(0,0,0,0.30);
+    opacity: 0;
+    transform: translateY(10px) scale(0.996);
+    filter: blur(6px);
+    text-wrap: balance;
+    will-change: transform, opacity, filter;
+  }
+  .proposal__question em {
+    font-style: italic;
+    font-variation-settings: "SOFT" 100, "WONK" 1;
+    font-weight: 380;
+    color: var(--cream);
+  }
+  .proposal__actions {
+    position: relative;
+    margin-top: var(--sp-12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    width: 100%;
+    max-width: 320px;
+    min-height: 52px;
+    opacity: 0;
+  }
+  /* keep actions interactive even though .scene is pointer-events:none until is-active */
+  .proposal.is-active .proposal__actions { pointer-events: auto; }
+
+  .btn {
+    appearance: none;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 16px 28px;
+    min-width: 124px;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    transition: transform 140ms var(--ease-out-quint), box-shadow 200ms ease-out, background 200ms ease-out, border-color 200ms ease-out, opacity 180ms ease, filter 140ms ease;
+    will-change: transform;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+  /* pressed state — tactile squash, not just scale */
+  .btn--yes:active { transform: scale(0.97); filter: brightness(1.06); }
+  .btn--no:active  { transform: scale(0.97); background: rgba(244,234,228,0.12); }
+
+  .btn--yes {
+    background: linear-gradient(180deg, #8F2940 0%, var(--wine) 62%, #5E1630 100%);
+    color: var(--cream);
+    border-color: rgba(244,234,228,0.14);
+    box-shadow: 0 8px 24px rgba(60,14,30,0.42), 0 1px 8px rgba(60,14,30,0.32), 0 0 0 1px rgba(244,234,228,0.06) inset, 0 1px 0 rgba(255,255,255,0.10) inset;
+  }
+  .btn--yes:hover { transform: translateY(-1px) scale(1.012); box-shadow: 0 10px 28px rgba(60,14,30,0.50), 0 2px 10px rgba(60,14,30,0.28), 0 0 0 1px rgba(244,234,228,0.08) inset; }
+  .btn--yes.is-pulse { animation: yes-pulse 2.2s ease-in-out infinite; }
+  @keyframes yes-pulse {
+    0%, 100% { box-shadow: 0 8px 22px rgba(60,14,30,0.40), 0 0 0 1px rgba(244,234,228,0.05) inset; }
+    50%      { box-shadow: 0 10px 26px rgba(60,14,30,0.52), 0 0 14px rgba(226,84,95,0.14), 0 0 0 1px rgba(244,234,228,0.06) inset; }
+  }
+
+  .btn--no {
+    background: rgba(244,234,228,0.06);
+    color: rgba(244,234,228,0.52);
+    border-color: rgba(244,234,228,0.14);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18), 0 0 0 1px rgba(244,234,228,0.03) inset;
+  }
+  .btn--no:hover { background: rgba(244,234,228,0.09); border-color: rgba(244,234,228,0.18); color: rgba(244,234,228,0.82); }
+  /* NO lives in the flex row until it starts dodging; then it detaches.
+     Must escape ancestor transforms/filters — see JS reparent in freeNo(). */
+  .btn--no.is-free {
+    position: fixed;
+    z-index: 9;
+    margin: 0;
+    transform: none !important;
+  }
+  .btn--no.is-shy { pointer-events: none; }
+
+  .proposal__whisper {
+    margin-top: var(--sp-6);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--cream-faint);
+    opacity: 0;
+    min-height: 14px;
+    transition: opacity 260ms ease, transform 260ms var(--ease-out-quint), color 200ms ease;
+    transform: translateY(2px);
+  }
+  .proposal__whisper.is-visible { opacity: 1; color: var(--cream-soft); transform: translateY(0); }
+
+  /* subtle system note — non-interactive, low prominence */
+  .proposal__note {
+    margin-top: 10px;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: var(--cream-faint);
+    opacity: 0.85;
+  }
+
+  /* CELEBRATION — scene 5: the explosion the whole film earns */
+  .celebration {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    overflow: hidden;
+  }
+  .celebration.is-active { pointer-events: auto; opacity: 1; }
+  .celebration__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  /* focal heart: fixed, positioned by JS at burst origin, then centered via GSAP */
+  .celebration__heart {
+    position: fixed;
+    z-index: 7;
+    left: 50%; top: 50%;
+    margin: 0;
+    line-height: 1;
+    filter: drop-shadow(0 0 28px rgba(226,84,95,0.52)) drop-shadow(0 0 56px rgba(122,30,61,0.40));
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+    will-change: transform, filter, opacity;
+    pointer-events: none;
+  }
+  .celebration__heart svg { display: block; width: 72px; height: 68px; }
+  /* halo behind the focal heart */
+  .celebration__halo {
+    position: fixed;
+    z-index: 6;
+    left: 50%; top: 50%;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(226,84,95,0.42), rgba(122,30,61,0.22) 48%, transparent 72%);
+    filter: blur(10px);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  .celebration__label {
+    position: relative;
+    z-index: 1;
+    margin-top: 18px;
+    font-family: var(--font-display);
+    font-weight: 420;
+    font-variation-settings: "SOFT" 100, "WONK" 1;
+    font-style: italic;
+    font-size: clamp(18px, 5vw, 22px);
+    color: var(--cream);
+    letter-spacing: 0.02em;
+    opacity: 0;
+    text-shadow: 0 2px 18px rgba(226,84,95,0.35);
+  }
+  .celebration__flash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(closest-side, rgba(244,234,228,0.14), transparent 72%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* FINAL MESSAGE — scene 6: the verbatim Hinglish — editorial letter, not a card */
+  .finalmsg {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: calc(var(--sat) + 18px) 0 calc(max(28px, var(--sab)) + 12px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .finalmsg.is-active { opacity: 1; pointer-events: auto; }
+  .finalmsg::-webkit-scrollbar { width: 0; }
+  .finalmsg__inner {
+    width: min(336px, calc(100% - 44px));
+    margin: 0 auto;
+    padding-top: clamp(14px, 3.5vh, 30px);
+  }
+  /* tiny masthead — date + hairline, like a letterhead */
+  .finalmsg__mast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    opacity: 0;
+  }
+  .finalmsg__mast-rule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(244,234,228,0.14), transparent);
+  }
+  .finalmsg__mast-mark {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--ember);
+    box-shadow: 0 0 10px rgba(226,84,95,0.55);
+    opacity: 0.9;
+    flex: 0 0 auto;
+  }
+  .finalmsg__kicker {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-variation-settings: "SOFT" 100, "WONK" 1;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 1.2;
+    letter-spacing: 0.14em;
+    text-transform: none;
+    color: var(--cream-mid);
+    opacity: 0;
+    margin-bottom: 10px;
+  }
+  .finalmsg__kicker em {
+    font-style: italic;
+    font-weight: 380;
+    color: var(--cream);
+  }
+  .finalmsg__lede {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.38em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    margin-bottom: 22px;
+    opacity: 0;
+  }
+  .finalmsg__para {
+    font-family: var(--font-body);
+    font-size: clamp(14.5px, 4.1vw, 16.5px);
+    line-height: 1.92;
+    letter-spacing: 0.012em;
+    color: rgba(244,234,228,0.92);
+    text-align: left;
+    margin-bottom: 20px;
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(5px);
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    hyphens: manual;
+    max-width: 100%;
+  }
+  /* first-letter drop — editorial touch, content unchanged */
+  .finalmsg__para--open::first-letter {
+    font-family: var(--font-display);
+    font-weight: 520;
+    font-variation-settings: "SOFT" 100, "WONK" 0;
+    font-size: 1.55em;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    color: var(--cream);
+    float: left;
+    margin: 0.12em 0.14em 0 0;
+    text-shadow: 0 2px 20px rgba(226,84,95,0.22);
+  }
+  .finalmsg__para.is-em {
+    font-weight: 400;
+    color: var(--cream);
+    text-shadow: 0 2px 16px rgba(226,84,95,0.16), 0 1px 0 rgba(0,0,0,0.22);
+  }
+  .finalmsg__para .hl {
+    position: relative;
+    color: var(--cream);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0 10px rgba(122,30,61,0.22);
+    background: linear-gradient(180deg, transparent 62%, rgba(122,30,61,0.26) 62%, rgba(122,30,61,0.10) 100%);
+    padding: 0 2px 1px;
+    border-radius: 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .finalmsg__para .hl--soft {
+    font-weight: 500;
+    background: linear-gradient(180deg, transparent 62%, rgba(122,30,61,0.22) 62%, rgba(122,30,61,0.08) 100%);
+  }
+  .finalmsg__para .heart {
+    display: inline-block;
+    margin-left: 3px;
+    filter: drop-shadow(0 0 10px rgba(226,84,95,0.40));
+    vertical-align: baseline;
+    font-size: 0.95em;
+  }
+  .finalmsg__rule {
+    width: 28px;
+    height: 1px;
+    margin: 24px auto 18px;
+    background: linear-gradient(90deg, transparent, rgba(226,84,95,0.28), transparent);
+    opacity: 0;
+    transform: scaleX(0.6);
+    transform-origin: center;
+  }
+  .finalmsg__signoff {
+    text-align: center;
+    margin-top: 2px;
+    opacity: 0;
+  }
+  .finalmsg__signoff-mark {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--cream-faint);
+    margin-bottom: 10px;
+  }
+  .finalmsg__hint {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    opacity: 0;
+    text-align: center;
+  }
+
+  /* FOREVER — scene 7: the afterglow */
+  .forever {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 20px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-8px);
+  }
+  .forever.is-active { opacity: 1; pointer-events: auto; }
+  .forever__heart {
+    line-height: 1;
+    filter: drop-shadow(0 0 28px rgba(226,84,95,0.45)) drop-shadow(0 0 52px rgba(122,30,61,0.35));
+    animation: forever-pulse 3s ease-in-out infinite;
+    will-change: transform, filter;
+  }
+  .forever__heart svg { display: block; width: 60px; height: 56px; }
+  @keyframes forever-pulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 28px rgba(226,84,95,0.45)) drop-shadow(0 0 52px rgba(122,30,61,0.35)); }
+    50%      { transform: scale(1.04); filter: drop-shadow(0 0 36px rgba(226,84,95,0.62)) drop-shadow(0 0 64px rgba(122,30,61,0.45)); }
+  }
+  .forever__line {
+    margin-top: 22px;
+    font-family: var(--font-display);
+    font-weight: 380;
+    font-variation-settings: "SOFT" 100, "WONK" 0;
+    font-size: clamp(22px, 6vw, 28px);
+    color: var(--cream);
+    letter-spacing: 0.01em;
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  .forever__sub {
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    color: var(--cream-faint);
+    opacity: 0;
+  }
+  .forever__replay {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: calc(var(--sab) + 26px);
+    text-align: center;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cream-faint);
+    opacity: 0;
+  }
+
+  /* ============================================================================
+     7. TAP SURFACE
+     Full-bleed semantic button. The content is set dressing; this is the control.
+     ============================================================================ */
+  .stage__hit {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* skip-link owns its own focus; stage hit uses global :focus-visible ring */
+
+  /* hidden when a scene owns the hit area */
+  .stage__hit.is-hidden { display: none; pointer-events: none; }
+  /* once S1 is hidden its content must not intercept pointer events */
+  .stage__content[style*="opacity: 0"] { pointer-events: none; }
+
+  /* ============================================================================
+     8. MOTION PREFERENCES
+     ============================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    .stage,
+    .stage::after,
+    .stage__glow,
+    .ember,
+    .stage__hud .rec,
+    .intro__label-arrow,
+    .btn--yes.is-pulse,
+    .forever__heart,
+    .celebration__heart,
+    .celebration__halo,
+    .stage.is-settled .stage__content {
+      animation: none !important;
+    }
+    .intro__word { opacity: 0; transition: none; will-change: auto; }
+    .story__line, .buildup__name, .buildup__line, .proposal__eyebrow, .proposal__question,
+    .finalmsg__para, .forever__line,
+    .stage__content, .proposal__actions, .finalmsg__inner { animation: none !important; }
+    .stage::after { opacity: 0 !important; }
+    .stage__glow { opacity: 0.22 !important; filter: none !important; }
+  }
+
+  /* =========================================================================
+     9. DESKTOP / TABLET POLISH — hyper-optimised separately from mobile
+     Mobile is the hero (390×844); desktop is a centred cinema frame, not
+     a stretched phone. Every value is tuned so neither modality compromises.
+     ========================================================================= */
+  /* — focus visibility: WCAG 2.2 AA (2px ring, 3:1 contrast, never clipped) */
+  :focus-visible {
+    outline: 2px solid rgba(244,234,228,0.92);
+    outline-offset: 3px;
+  }
+  .stage__hit:focus-visible { outline-offset: -6px; }
+  .btn:focus-visible {
+    outline: 2px solid rgba(244,234,228,0.88);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(122,30,61,0.35);
+  }
+  /* keep :focus-visible single-source; do not add :focus fallbacks on .btn that would fight it */
+
+  /* — fine pointer: richer hover without hurting touch */
+  @media (hover: hover) and (pointer: fine) {
+    .intro__label:hover { color: var(--cream); }
+    .intro__label:hover .intro__label-arrow { transform: translateX(6px); opacity: 1; }
+    .story__hint:hover, .buildup__hint:hover, .finalmsg__hint:hover { color: var(--cream-soft); }
+    .btn--yes:hover { transform: translateY(-1px) scale(1.012); }
+    .btn--no:hover  { background: rgba(244,234,228,0.09); border-color: rgba(244,234,228,0.18); color: rgba(244,234,228,0.82); }
+  }
+
+  /* — tablet: breathe — larger measure, optical centring, softer veil */
+  @media (min-width: 600px) {
+    .stage__content { transform: translateY(-16px); padding: 0 28px; }
+    .intro__line { max-width: 17em; }
+    .story, .buildup, .proposal { padding: 0 28px; }
+    .finalmsg__inner { width: min(480px, calc(100% - 64px)); }
+    .finalmsg { padding-top: calc(var(--sat) + 28px); }
+    .stage__hud { padding: 0 28px; }
+  }
+
+  /* — desktop: cinema frame — letterboxed, max-readability measure, editorial scale */
+  @media (min-width: 900px) {
+    .stage {
+      /* letterbox: the film sits in a centred column with deep surround */
+      background: radial-gradient(120% 120% at 50% 44%, #151012 0%, #0A0608 56%, #060304 100%);
+    }
+    .stage::before {
+      background:
+        radial-gradient(110% 110% at 50% 42%, transparent 54%, rgba(0,0,0,0.46) 100%),
+        linear-gradient(180deg, rgba(0,0,0,0.16), transparent 18%, transparent 82%, rgba(0,0,0,0.22));
+    }
+    .stage__content { transform: translateY(-18px); }
+    :root { --fs-display: clamp(32px, 2.8vw, 42px); }
+    .intro__line { font-size: clamp(30px, 2.6vw, 42px); line-height: 1.28; }
+    .intro__label { font-size: 11px; letter-spacing: 0.24em; }
+    .story__line { font-size: clamp(22px, 1.7vw, 28px); }
+    .story__line.is-soft { font-size: clamp(21px, 1.6vw, 26px); }
+    .story__line.is-date { letter-spacing: 0.32em; }
+    .buildup__name { font-size: clamp(46px, 4vw, 64px); }
+    .buildup__line { font-size: clamp(20px, 1.5vw, 26px); }
+    .proposal__question { font-size: clamp(34px, 3vw, 48px); }
+    .proposal__eyebrow { letter-spacing: 0.32em; }
+    .finalmsg__inner { width: min(560px, calc(100% - 96px)); padding-top: clamp(24px, 4vh, 44px); }
+    .finalmsg__para { font-size: 16.5px; line-height: 1.92; }
+    .finalmsg__kicker { font-size: 14px; }
+    .finalmsg__lede { letter-spacing: 0.32em; }
+    .forever__line { font-size: clamp(24px, 1.8vw, 32px); }
+    .stage__hud { top: calc(var(--sat) + 20px); padding: 0 32px; font-size: 10px; letter-spacing: 0.22em; }
+    .stage__stamp { bottom: calc(var(--sab) + 20px); }
+    /* buttons: a touch larger on desktop, still elegant */
+    .btn { min-width: 132px; min-height: 48px; padding: 16px 32px; font-size: 12px; }
+    .proposal__actions { gap: 20px; max-width: 360px; }
+    /* canvas particle area remains full-bleed; no change needed */
+  }
+
+  @media (min-width: 1280px) {
+    .finalmsg__inner { width: min(600px, calc(100% - 120px)); }
+    .stage__hud { padding: 0 40px; }
+  }
+
+  /* — small phones: protect the measure, never clip */
+  @media (max-width: 374px) {
+    .stage__content, .story, .buildup, .proposal { padding-left: 16px; padding-right: 16px; }
+    .finalmsg__inner { width: calc(100% - 32px); }
+    .finalmsg__para { font-size: 14.5px; line-height: 1.85; }
+    .btn { min-width: 112px; padding-left: 20px; padding-right: 20px; }
+    .proposal__actions { gap: 12px; }
+  }
+
+  /* — touch target guarantee: WCAG 2.5.5 AAA 44×44, AA 24×24 */
+  /* — tap surfaces (S1 hit, S2/S3, S6/S7) — keyboard + cursor, 140ms micro */
+  .story.is-active, .buildup.is-active,
+  .finalmsg.is-active, .forever.is-active { cursor: pointer; }
+  .story.is-active:focus-visible, .buildup.is-active:focus-visible,
+  .finalmsg.is-active:focus-visible, .forever.is-active:focus-visible {
+    outline: 2px solid rgba(244,234,228,0.82);
+    outline-offset: -10px;
+    border-radius: 4px;
+  }
+  .stage__hit, .story, .buildup, .finalmsg, .forever { transition: opacity 140ms ease; }
+
+  /* — WCAG target spacing: keep YES/NO gap ≥8px at every width (already 12-20px) */
+  .proposal__actions { gap: 18px; } /* explicit for a11y test tools */
+
+  /* — decorative atoms never intercept focus order */
+  .intro__rule, .story__rule, .finalmsg__mast-rule, .finalmsg__rule { pointer-events: none; }
+
+  /* viewport-height fix — Android Chrome address bar: keep --app-vh in sync */
+  /* also guards small Android (320–360) where the bar steals more height */
+
+  /* touch: keep the 48px min even when the user shrinks text */
+  @media (pointer: coarse) {
+    .btn { min-height: 48px; }
+    .stage__hit { min-height: 44px; }
+    /* NO when free-roaming is a fixed anchor — never let a long press select it */
+    .btn--no.is-free { -webkit-user-select: none; user-select: none; }
+    /* bigger gesture-bar phones (Samsung/Pixel): give Forever replay more footroom */
+    .forever__replay { bottom: calc(max(18px, var(--sab)) + 18px); padding: 10px 18px; }
+  }
+
+  /* narrow Android (320–360) — tighter HUD, tighter measure, slightly smaller NO */
+  @media (max-width: 360px) {
+    .stage__hud { letter-spacing: 0.16em; font-size: 9.5px; }
+    .proposal__question { letter-spacing: -0.01em; }
+    .finalmsg__para .hl { padding-inline: 1px; }
+  }
+
+  /* mid Android (390–428) — the spec device + larger Androids */
+  @media (min-width: 390px) and (max-width: 430px) {
+    .stage__hud { padding-inline: max(16px, 20px); }
+    .finalmsg__inner { width: min(348px, calc(100% - 36px)); }
+  }
+
+  /* landscape / short viewport — keep the film centered, not clipped */
+  @media (max-height: 520px) and (orientation: landscape) {
+    .stage__content { transform: translateY(-8px); }
+    .story, .buildup, .proposal { transform: translateY(-6px); }
+    .proposal__actions { margin-top: 18px; }
+    .finalmsg { padding-top: calc(var(--sat) + 10px); }
+    .finalmsg__inner { padding-top: 8px; }
+    .forever { transform: translateY(-4px); }
+  }
+
+  /* Android low-power / budget GPU — lighter grain, shorter ember tail */
+  @media (prefers-reduced-data: reduce), (max-width: 360px) and (max-height: 740px) {
+    .stage::after { opacity: 0.10; animation-duration: 1.8s; }
+    .stage__glow { filter: blur(4px); }
+  }
+  </style>
+</head>
+
+<body>
+  <a href="#content" class="skip-link">Skip to content</a>
+  <main class="stage" id="stage" data-scene="1" aria-label="A message for Kanu">
+
+    <!-- Atmosphere: glow + ember dust behind every scene -->
+    <div class="stage__atmosphere" aria-hidden="true">
+      <div class="stage__glow"></div>
+      <div class="stage__embers" id="embers"></div>
+    </div>
+    <p class="sr-only" aria-live="polite" aria-atomic="true" id="live-region"></p>
+
+    <!-- Filmic chrome -->
+    <header class="stage__hud" id="hud" aria-hidden="true">
+      <span>For Kanu</span>
+      <span><i class="rec" aria-hidden="true"></i>SC&thinsp;.&thinsp;01</span>
+    </header>
+
+    <!-- Scene 1 content -->
+    <div class="stage__content" id="content">
+      <!-- h1: the film's title — only one per page; S3/S4 use h2 for the arc -->
+      <h1 class="intro__line" id="intro-line">
+        I made something for you…
+      </h1>
+      <div class="intro__cta" id="cta">
+        <span class="intro__rule" id="cta-rule" aria-hidden="true"></span>
+        <span class="intro__label" id="cta-label">
+          <span>Tap to begin</span>
+          <span class="intro__label-arrow" aria-hidden="true">→</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Filmic citation -->
+    <div class="stage__stamp" id="stamp" aria-hidden="true">23&thinsp;·&thinsp;02</div>
+
+    <!-- Full-bleed tap surface (Scene 1 only; hidden after) -->
+    <button class="stage__hit" id="hit" aria-label="Begin"></button>
+
+    <div class="stage__veil" id="veil" aria-hidden="true"></div>
+
+    <!-- Scene 2 — Our story -->
+    <section class="scene story" id="scene-2" aria-label="Our story" tabindex="0" hidden>
+      <p class="story__line is-date" id="s2-date">23 February</p>
+      <p class="story__line" id="s2-a">A random conversation.</p>
+      <p class="story__line is-soft" id="s2-b">And somehow… it became us.</p>
+      <div class="story__rule" id="s2-rule" aria-hidden="true"></div>
+      <p class="story__hint" id="s2-hint">Tap to continue</p>
+    </section>
+
+    <!-- Scene 3 — Build-up -->
+    <section class="scene buildup" id="scene-3" aria-label="Build up" tabindex="0" hidden>
+      <h2 class="buildup__name" id="s3-name">Kanu…</h2>
+      <p class="buildup__line" id="s3-line">I have one question for you.</p>
+      <p class="buildup__hint" id="s3-hint">Tap to continue</p>
+    </section>
+
+    <!-- Scene 4 — The question -->
+    <section class="scene proposal" id="scene-4" aria-label="Proposal" hidden>
+      <p class="proposal__eyebrow" id="s4-eyebrow">One question</p>
+      <h2 class="proposal__question" id="s4-question">Will you<br><em>marry</em> me?</h2>
+      <div class="proposal__actions" id="s4-actions">
+        <button class="btn btn--yes" id="btn-yes" type="button" aria-label="Yes">Yes</button>
+        <button class="btn btn--no" id="btn-no" type="button" aria-label="No">No</button>
+      </div>
+      <p class="proposal__whisper" id="s4-whisper" aria-live="polite"></p>
+    </section>
+
+    <!-- Scene 5 — Celebration (canvas explosion) -->
+    <section class="celebration" id="scene-5" aria-label="Celebration" hidden>
+      <canvas class="celebration__canvas" id="cel-canvas" aria-hidden="true"></canvas>
+      <div class="celebration__flash" id="cel-flash" aria-hidden="true"></div>
+      <div class="celebration__halo" id="cel-halo" aria-hidden="true"></div>
+      <div class="celebration__heart" id="cel-heart" aria-hidden="true"><svg viewBox="0 0 32 30" width="72" height="68" aria-hidden="true" focusable="false"><path d="M16 26 C16 26 2 17.2 2 9.6 C2 4.5 6.0 1 10.9 1 C13.7 1 15.2 2.6 16 4.2 C16.8 2.6 18.3 1 21.1 1 C26.0 1 30 4.5 30 9.6 C30 17.2 16 26 16 26Z" fill="var(--ember)"/></svg></div>
+      <p class="celebration__label" id="cel-label" aria-hidden="true">She said yes.</p>
+    </section>
+
+    <!-- Scene 6 — Final message (VERBATIM — do not edit wording) -->
+    <!--
+      VERBATIM SOURCE (Hinglish, spelling/caps/elongation preserved exactly).
+      Only hearts/emoji are added via <span class="heart"> — never reword.
+    -->
+    <section class="finalmsg" id="scene-6" aria-label="A message for Kanu" hidden>
+      <div class="finalmsg__inner">
+        <div class="finalmsg__mast" id="fm-mast" aria-hidden="true">
+          <span class="finalmsg__mast-rule"></span>
+          <span class="finalmsg__mast-mark"></span>
+          <span class="finalmsg__mast-rule"></span>
+        </div>
+        <p class="finalmsg__kicker" id="fm-kicker">For <em>Kanu</em> —</p>
+        <p class="finalmsg__lede" id="fm-lede">A little letter, with all my heart</p>
+        <p class="finalmsg__para finalmsg__para--open" id="fm-p1">Kanu kesiiiiiii haii kesi lagi teko te website ??? I LOVE YOU SO MUCHHH <span class="heart">❤️</span> yk i was working on this site for days kyuki yk ekbar tune esi reel bheji thi ki tu esa kch kr skta hai?? and i really wanted ki me kar pau but yk i was busy and stuff. Anyways mene koshish kri wesa kch bnane kii,</p>
+        <p class="finalmsg__para is-em" id="fm-p2">Teko pta hai <span class="hl">ME TERE SE ITNAAAAAAAAAAAAAAAAAAA SARA PYAR KRTA HU</span> <span class="heart">❤️❤️</span> aur <span class="hl hl--soft">HMESHA KRTA RHUNGA JAN MERI ME KBHI KHI NHI JAUNGA TU MERI HAI ME TERA HU ALWAYS AND ALWAYS.</span> <span class="heart">❤️</span></p>
+        <p class="finalmsg__para" id="fm-p3">I want ki hmara rishta ese hi chlta rhe chahe jitni mushkile ayein hum hmesha unko hra k sth sth bne rhe <span class="hl hl--soft">I LOVE YOU SOOOO MUCHHH KANUUU,</span> <span class="heart">❤️❤️</span> MEKO TO PTA HI THA HU YES CLICK KREGI HEHEHEH <span class="heart">😄🎉</span></p>
+        <div class="finalmsg__rule" id="fm-rule" aria-hidden="true"></div>
+        <div class="finalmsg__signoff" id="fm-signoff" aria-hidden="true">
+          <span class="finalmsg__signoff-mark">— yours</span>
+        </div>
+        <p class="finalmsg__hint" id="fm-hint">Tap to continue</p>
+      </div>
+    </section>
+
+    <!-- Scene 7 — Forever -->
+    <section class="forever" id="scene-7" aria-label="Forever" hidden>
+      <div class="forever__heart" id="fv-heart" aria-hidden="true"><svg viewBox="0 0 32 30" width="60" height="56" aria-hidden="true" focusable="false"><path d="M16 26 C16 26 2 17.2 2 9.6 C2 4.5 6.0 1 10.9 1 C13.7 1 15.2 2.6 16 4.2 C16.8 2.6 18.3 1 21.1 1 C26.0 1 30 4.5 30 9.6 C30 17.2 16 26 16 26Z" fill="var(--ember)"/></svg></div>
+      <p class="forever__line" id="fv-line">Forever. <span class="heart">❤️</span></p>
+      <p class="forever__sub" id="fv-sub">— yours</p>
+      <button class="forever__replay" id="fv-replay" type="button" aria-label="Replay from the beginning">Tap to replay ↻</button>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script>
+  /* ============================================================================
+     FOR KANU — scene runtime
+     ----------------------------------------------------------------------------
+     window.Kanu is a tiny scene engine. Scenes register { mount, play, exit }
+     and the stage owns the shared atmosphere + chrome. Scene 1 is fully wired;
+     scenes 2–8 mount their own content with the same contract.
+     ============================================================================ */
+  // Android Chrome address-bar: sync --app-vh to the real visual viewport
+  // to prevent the fixed .stage from jumping when the bar shows/hides.
+  (function syncAppVh() {
+    const vv = window.visualViewport;
+    const set = () => {
+      const h = (vv && vv.height) || window.innerHeight;
+      document.documentElement.style.setProperty('--app-vh', h + 'px');
+    };
+    set();
+    // rAF-debounced to avoid layout thrash on resize/orientation
+    let raf = 0;
+    const onResize = () => { if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { raf = 0; set(); }); };
+    if (vv) { vv.addEventListener('resize', onResize); vv.addEventListener('scroll', onResize); }
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(set, 180));
+  })();
+
+  (function (global) {
+    'use strict';
+
+    const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const HAS_GSAP = typeof window.gsap !== 'undefined';
+
+    /* ----------------------------------------------------------------
+       Utils
+       ---------------------------------------------------------------- */
+    const utils = {
+      $: (sel, root = document) => root.querySelector(sel),
+      $$: (sel, root = document) => Array.from(root.querySelectorAll(sel)),
+      delay: (ms) => new Promise((r) => setTimeout(r, ms)),
+      clamp: (v, lo, hi) => Math.max(lo, Math.min(hi, v)),
+
+      splitWords(el) {
+        const text = el.textContent.trim().replace(/\s+/g, ' ');
+        const words = text.split(' ');
+        el.textContent = '';
+        const spans = words.map((word, i) => {
+          const s = document.createElement('span');
+          s.className = 'intro__word';
+          s.textContent = word;
+          el.appendChild(s);
+          if (i < words.length - 1) el.appendChild(document.createTextNode(' '));
+          return s;
+        });
+        return spans;
+      },
+    };
+
+    /* ----------------------------------------------------------------
+       Ember dust (7 nodes, transform-only)
+       ---------------------------------------------------------------- */
+    function spawnEmbers(count) {
+      if (REDUCED.matches) return;
+      const host = utils.$('#embers');
+      if (!host) return;
+      for (let i = 0; i < count; i++) {
+        const e = document.createElement('span');
+        e.className = 'ember';
+        e.style.setProperty('--x', `${8 + Math.random() * 84}%`);
+        e.style.setProperty('--size', `${1.5 + Math.random() * 1.8}px`);
+        e.style.setProperty('--o', (0.22 + Math.random() * 0.3).toFixed(2));
+        e.style.setProperty('--dur', `${14 + Math.random() * 12}s`);
+        e.style.setProperty('--delay', `${-Math.random() * 20}s`);
+        e.style.setProperty('--sway', `${(Math.random() - 0.5) * 60}px`);
+        host.appendChild(e);
+      }
+    }
+
+    /* ================================================================
+       DIRECTOR — one continuous film, not separate pages
+       ---------------------------------------------------------------
+       Scenes register { mount, play, exit }. The Director owns the
+       veil (editorial cut), the shared atmosphere, and the HUD.
+       ================================================================ */
+    const Director = {
+      current: 1,
+      busy: false,
+
+      els() {
+        return {
+          stage: utils.$('#stage'),
+          veil:  utils.$('#veil'),
+          glow:  utils.$('.stage__glow'),
+          hud:   utils.$('#hud'),
+          stamp: utils.$('#stamp'),
+        };
+      },
+
+      hudFor(id) {
+        const map = { 1: 'SC&thinsp;.&thinsp;01', 2: 'SC&thinsp;.&thinsp;02', 3: 'SC&thinsp;.&thinsp;03', 4: 'SC&thinsp;.&thinsp;04', 5: 'SC&thinsp;.&thinsp;05', 6: 'SC&thinsp;.&thinsp;06', 7: 'SC&thinsp;.&thinsp;07' };
+        return map[id] || `SC&thinsp;.&thinsp;0${id}`;
+      },
+
+      go(next) {
+        const from = this.current;
+        if (from === next) return;
+        if (this.busy) return;
+        const entering = Kanu.scenes.get(next);
+        if (!entering) return;
+        const leaving = Kanu.scenes.get(from);
+        // normalize: every exit(done) owns its out-animation and then calls done.
+        // Director owns only the final mount/play.
+        const finalize = (done) => {
+          this.current = next;
+          const stage = utils.$('#stage');
+          stage.dataset.scene = String(next);
+          const hudNum = stage.querySelector('.stage__hud span:last-child');
+          if (hudNum) hudNum.innerHTML = `<i class="rec" aria-hidden="true"></i>${this.hudFor(next)}`;
+          try { entering.mount(); } catch(e){ console.error(e); }
+          try { entering.play(); } catch(e){ console.error(e); }
+          this.busy = false;
+          if (typeof done === 'function') try{ done(); }catch(e){ console.error(e); }
+          Kanu.emit('scene:changed', { from, to: next });
+        };
+        // leave exit owns the busy window; Go only claims it when the exit actually starts
+        const onLeft = () => finalize();
+        if (leaving && leaving.exit) {
+          try {
+            const accepted = leaving.exit(onLeft);
+            // exit returns true when it will call done, false when it early-returns (not ready)
+            if (accepted === false) return;
+            this.busy = true;
+            void accepted;
+          } catch(e){ console.error(e); this.busy=false; }
+        } else {
+          this.busy = true;
+          this.cut(onLeft);
+        }
+      },
+
+          cut(done) {
+        const veil = utils.$('#veil');
+        if (!HAS_GSAP || REDUCED.matches) { done(); return; }
+        const tl = gsap.timeline();
+        tl.to(veil, { opacity: 1, duration: 0.28, ease: 'power2.in' }, 0)
+          .to(veil, { opacity: 0, duration: 0.42, ease: 'power2.out' }, 0.32);
+        tl.eventCallback('onComplete', done);
+      },
+    };
+
+    /* ----------------------------------------------------------------
+       Scene 1 — intro
+       ---------------------------------------------------------------- */
+    const scene1 = {
+      name: 'intro',
+      mounted: false,
+
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        spawnEmbers(7);
+        this.hit     = utils.$('#hit');
+        this.content = utils.$('#content');
+        this.hud     = utils.$('#hud');
+        this.stamp   = utils.$('#stamp');
+        this.cta     = utils.$('#cta');
+        this.rule    = utils.$('#cta-rule');
+        this.words = utils.splitWords(utils.$('#intro-line'));
+        this.hit.addEventListener('pointerdown', () => utils.$('#stage').classList.add('is-pressing'));
+        this.hit.addEventListener('pointerup',   () => utils.$('#stage').classList.remove('is-pressing'));
+        this.hit.addEventListener('pointercancel', () => utils.$('#stage').classList.remove('is-pressing'));
+        this.hit.addEventListener('click', () => Director.go(2));
+      },
+
+      play() {
+        const hasGSAP = HAS_GSAP && !REDUCED.matches;
+        if (!hasGSAP) { this.revealPlain(); return; }
+        gsap.set(this.words, { opacity: 0, y: 18, filter: 'blur(4px)', willChange: 'opacity, transform, filter' });
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.to(this.words, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.15, stagger: 0.075, clearProps: 'filter, willChange' }, 0.35)
+          .to(this.rule, { scaleX: 1, duration: 0.85, ease: 'power2.inOut' }, 2.1)
+          .to(this.cta, { opacity: 1, duration: 0.8, ease: 'power2.out' }, '-=0.35')
+          .to([this.hud, this.stamp], { opacity: 1, duration: 0.9, ease: 'power2.out' }, 0.7)
+          .eventCallback('onComplete', () => { utils.$('#stage').classList.add('is-settled'); this.ready = true; });
+      },
+
+      revealPlain() {
+        if (HAS_GSAP) gsap.set(this.words, { opacity: 1, y: 0, filter: 'blur(0px)' });
+        else this.words.forEach((w) => { w.style.opacity = 1; w.style.transform = 'translateY(0)'; });
+        for (const el of [this.cta, this.hud, this.stamp]) if (el) el.style.opacity = 1;
+        if (this.rule) this.rule.style.transform = 'scaleX(1)';
+        utils.$('#stage').classList.add('is-settled', 'no-choreography');
+        this.ready = true;
+      },
+
+      exit(done) {
+        if (this.exiting) return false;
+        if (!this.ready) return false;
+        this.exiting = true;
+        const goNext = done || (() => Director.go(2));
+        const next = () => { try { goNext(); } catch(e) { console.error(e); } };
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.content.style.opacity = 0;
+          if (this.hud) this.hud.style.opacity = 0;
+          next();
+          return true;
+        }
+        const veil = utils.$('#veil');
+        const tl = gsap.timeline({ defaults: { ease: 'power2.in' } });
+        tl.to(this.words, { opacity: 0, y: -14, filter: 'blur(8px)', duration: 0.42, stagger: 0.02 }, 0)
+          .to(this.cta,   { opacity: 0, y: 8, duration: 0.36 }, 0.08)
+          .to([this.hud, this.stamp], { opacity: 0, duration: 0.32 }, 0.04)
+          .to(this.content, { opacity: 0, duration: 0.22 }, 0.28)
+          .to(veil, { opacity: 1, duration: 0.22, ease: 'power2.in' }, 0.18)
+          .to(veil, { opacity: 0, duration: 0.38, ease: 'power2.out' }, 0.44);
+        tl.eventCallback('onComplete', next);
+      },
+    };
+
+    /* ----------------------------------------------------------------
+       Scene 2 — Our story
+       23 February. → A random conversation. → And somehow… it became us.
+       Choreography: date first (small, sober), then line 1, then line 2
+       with a soft italic. No page break — it grows inside the same frame.
+       ---------------------------------------------------------------- */
+    const scene2 = {
+      mounted: false,
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        this.el   = utils.$('#scene-2');
+        this.date = utils.$('#s2-date');
+        this.a    = utils.$('#s2-a');
+        this.b    = utils.$('#s2-b');
+        this.rule = utils.$('#s2-rule');
+        this.hint = utils.$('#s2-hint');
+        // tap/click anywhere in S2 to continue (once ready) — route through Director so busy/HUD stay coherent
+        // keyboard handled via stage-level listener below (no aria button needed on the section)
+        this._onTap = () => Director.go(3);
+        this.el.addEventListener('click', this._onTap);
+      },
+
+      play() {
+        const el = this.el;
+        el.hidden = false;
+        // reset for replay
+        if (HAS_GSAP) gsap.set([this.date, this.a, this.b, this.rule, this.hint], { clearProps: 'all' });
+        el.classList.add('is-active');
+        const veil = utils.$('#veil');
+        if (HAS_GSAP) gsap.set(veil, { opacity: 0 });
+
+        // ensure S1 content is hidden behind veil
+        const s1 = utils.$('#content');
+        if (s1) s1.style.opacity = 0;
+        const hit = utils.$('#hit');
+        if (hit) hit.classList.add('is-hidden');
+
+        // restore chrome for S2 then re-reveal
+        const hud = utils.$('#hud'), stamp = utils.$('#stamp');
+        if (hud) hud.style.opacity = 0;
+        if (stamp) stamp.style.opacity = 0;
+
+        if (!HAS_GSAP || REDUCED.matches) {
+          for (const n of [this.date, this.a, this.b]) { n.style.opacity = 1; n.style.transform = 'translateY(0)'; n.style.filter = 'none'; }
+          this.rule.style.opacity = 1; this.rule.style.transform = 'scaleX(1)';
+          this.hint.style.opacity = 1;
+          if (hud) hud.style.opacity = 1;
+          this.ready = true;
+          return;
+        }
+
+        // stage glow breathes a touch warmer into S2
+        gsap.set(el, { opacity: 1 });
+        gsap.set([this.date, this.a, this.b], { opacity: 0, y: 14, filter: 'blur(6px)' });
+        gsap.set(this.rule, { opacity: 0, scaleX: 0.6 });
+        gsap.set(this.hint, { opacity: 0, y: 6 });
+        if (hud) gsap.set(hud, { opacity: 0 });
+
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.to(hud, { opacity: 1, duration: 0.7, ease: 'power2.out' }, 0)
+          .to(this.date, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9 }, 0.18)
+          .to(this.a,    { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.95 }, 0.95)
+          .to(this.b,    { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.0 }, 1.85)
+          .to(this.rule, { opacity: 1, scaleX: 1, duration: 0.7, ease: 'power2.inOut' }, 2.65)
+          .to(this.hint, { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, 3.15)
+          .eventCallback('onComplete', () => {
+            // subtle breathe once settled
+            gsap.to(el, { y: -2, duration: 2.8, ease: 'sine.inOut', yoyo: true, repeat: 1 });
+            this.ready = true;
+          });
+
+        // auto-advance is NOT used — tap-gated for pacing
+      },
+
+      exit(done) {
+        if (this._exitDone) return false;
+        if (!this.ready) return false;
+        this._exitDone = true;
+        const next = done || (() => Director.go(3));
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.el.style.opacity = 0;
+          this.el.hidden = true;
+          this.el.classList.remove('is-active');
+          next();
+          return;
+        }
+        const veil = utils.$('#veil');
+        const tl = gsap.timeline();
+        tl.to([this.date, this.a, this.b], { opacity: 0, y: -10, filter: 'blur(6px)', duration: 0.38, stagger: 0.06, ease: 'power2.in' }, 0)
+          .to([this.rule, this.hint], { opacity: 0, duration: 0.28 }, 0.06)
+          .to(this.el, { opacity: 0, duration: 0.22 }, 0.12)
+          .to(veil, { opacity: 1, duration: 0.20, ease: 'power2.in' }, 0.14)
+          .to(veil, { opacity: 0, duration: 0.36, ease: 'power2.out' }, 0.36);
+        tl.eventCallback('onComplete', () => { this.el.hidden = true; this.el.classList.remove('is-active'); next(); });
+        return true;
+      },
+    };
+
+    /* ----------------------------------------------------------------
+       Scene 3 — Build-up
+       KANU… + I have one question for you.
+       The name lands heavy and glows; the question arrives lighter.
+       ---------------------------------------------------------------- */
+    const scene3 = {
+      mounted: false,
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        this.el   = utils.$('#scene-3');
+        this.name = utils.$('#s3-name');
+        this.line = utils.$('#s3-line');
+        this.hint = utils.$('#s3-hint');
+        this._onTap = () => Director.go(4);
+        this.el.addEventListener('click', this._onTap);
+      },
+
+      play() {
+        this.el.hidden = false;
+        if (HAS_GSAP) gsap.set([this.name, this.line, this.hint], { clearProps: 'all' });
+        this.el.classList.add('is-active');
+        const veil = utils.$('#veil');
+        if (HAS_GSAP) gsap.set(veil, { opacity: 0 });
+        const hud = utils.$('#hud');
+        if (hud) hud.style.opacity = 1;
+
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.name.style.opacity = 1; this.name.style.transform = 'scale(1)'; this.name.style.filter = 'none';
+          this.line.style.opacity = 1; this.line.style.transform = 'translateY(0)'; this.line.style.filter = 'none';
+          this.hint.style.opacity = 1;
+          this.ready = true;
+          return;
+        }
+
+        // glow intensifies for the name beat
+        const glow = utils.$('.stage__glow');
+        gsap.set(this.el, { opacity: 1 });
+        gsap.set(this.name, { opacity: 0, scale: 0.94, filter: 'blur(10px)' });
+        gsap.set(this.line, { opacity: 0, y: 12, filter: 'blur(6px)' });
+        gsap.set(this.hint, { opacity: 0, y: 6 });
+
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.to(this.name, { opacity: 1, scale: 1, filter: 'blur(0px)', duration: 1.05, ease: 'power3.out' }, 0.18)
+          .to(glow, { opacity: 1, scale: 1.04, duration: 0.9, ease: 'sine.inOut' }, 0.2)
+          .to(this.line, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.9 }, 1.15)
+          .to(this.hint, { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, 1.95)
+          .eventCallback('onComplete', () => {
+            // name heartbeat — very subtle, one cycle
+            gsap.to(this.name, { scale: 1.015, duration: 0.9, ease: 'sine.inOut', yoyo: true, repeat: 1, delay: 0.4 });
+            this.ready = true;
+          });
+      },
+
+      exit(done) {
+        if (this.exiting) return false;
+        if (!this.ready) return false;
+        this.exiting = true;
+        const next = done || (() => Director.go(4));
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.el.style.opacity = 0;
+          this.el.hidden = true;
+          this.el.classList.remove('is-active');
+          next();
+          return;
+        }
+        const veil = utils.$('#veil');
+        const glow = utils.$('.stage__glow');
+        const tl = gsap.timeline();
+        tl.to(this.name, { opacity: 0, scale: 0.98, filter: 'blur(8px)', duration: 0.42, ease: 'power2.in' }, 0)
+          .to(this.line, { opacity: 0, y: -8, filter: 'blur(6px)', duration: 0.36 }, 0.06)
+          .to(this.hint, { opacity: 0, duration: 0.26 }, 0.04)
+          .to(this.el,  { opacity: 0, duration: 0.20 }, 0.14)
+          .to(glow, { opacity: 0.85, duration: 0.3 }, 0)
+          .to(veil, { opacity: 1, duration: 0.20, ease: 'power2.in' }, 0.16)
+          .to(veil, { opacity: 0, duration: 0.42, ease: 'power2.out' }, 0.38);
+        tl.eventCallback('onComplete', () => { this.el.hidden = true; this.el.classList.remove('is-active'); next(); });
+      },
+    };
+
+    /* ----------------------------------------------------------------
+       Scene 4 — The question — YES / NO
+       ---------------------------------------------------------------- */
+    const scene4 = {
+      mounted: false,
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        this.el      = utils.$('#scene-4');
+        this.eyebrow = utils.$('#s4-eyebrow');
+        this.q       = utils.$('#s4-question');
+        this.actions = utils.$('#s4-actions');
+        this.btnYes  = utils.$('#btn-yes');
+        this.btnNo   = utils.$('#btn-no');
+        this.whisper = utils.$('#s4-whisper');
+        this.attempts = 0;
+        this.noFree = false;
+        this.noPos = { x: 0, y: 0 };
+        this._whisperTimer = null;
+
+        this.btnYes.addEventListener('click', () => this.onYes());
+        // NO: hover dodge on desktop only, tap dodge via guarded pointerdown+click
+        this._lastEvadeAt = 0;
+        const guardedEvade = (e) => {
+          const now = Date.now();
+          if (now - this._lastEvadeAt < 480) return;
+          this._lastEvadeAt = now;
+          this.evade(e);
+        };
+        this.btnNo.addEventListener('pointerenter', (e) => {
+          if (e.pointerType === 'mouse') guardedEvade(e);
+        });
+        this.btnNo.addEventListener('pointerdown', (e) => {
+          if (e.pointerType !== 'mouse') { e.preventDefault(); guardedEvade(e); }
+        });
+        this.btnNo.addEventListener('click', (e) => {
+          if (Date.now() - this._lastEvadeAt < 480) { e.preventDefault(); return; }
+          e.preventDefault(); guardedEvade(e);
+        });
+        // keep NO inside safe area on resize/orientation
+        window.addEventListener('resize', () => { if (this.noFree) this.clampNo(); });
+      },
+
+      play() {
+        this.el.hidden = false;
+        if (HAS_GSAP) gsap.set([this.eyebrow, this.q, this.actions, this.btnNo, this.btnYes], { clearProps: 'all' });
+        this.el.classList.add('is-active');
+        const veil = utils.$('#veil');
+        if (HAS_GSAP) gsap.set(veil, { opacity: 0 });
+
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.eyebrow.style.opacity = 1;
+          this.q.style.opacity = 1; this.q.style.transform = 'translateY(0) scale(1)'; this.q.style.filter = 'none';
+          this.actions.style.opacity = 1;
+          this.btnYes.classList.add('is-pulse');
+          return;
+        }
+
+        const glow = utils.$('.stage__glow');
+        gsap.set(this.el, { opacity: 1 });
+        gsap.set(this.eyebrow, { opacity: 0, y: 8 });
+        gsap.set(this.q, { opacity: 0, y: 16, scale: 0.98, filter: 'blur(10px)' });
+        gsap.set(this.actions, { opacity: 0, y: 12 });
+
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.to(this.eyebrow, { opacity: 1, y: 0, duration: 0.7 }, 0.18)
+          .to(this.q, { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 1.0 }, 0.45)
+          .to(glow, { opacity: 1, scale: 1.03, duration: 0.8, ease: 'sine.inOut' }, 0.5)
+          .to(this.actions, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' }, 1.05)
+          .eventCallback('onComplete', () => {
+            this.btnYes.classList.add('is-pulse');
+            // reduced-motion: keep NO still until interacted
+            if (REDUCED.matches) return;
+          });
+      },
+
+      // -- YES climax (Motion Director) ---------------------------------
+      // 0-150 compress/respond · 150-400 anticipation · 400+ major transition
+      onYes() {
+        if (this._yesDone) return;
+        this._yesDone = true;
+        this.btnYes.classList.remove('is-pulse');
+        // burst origin = YES button center (captured now; scene5 may be behind veil)
+        const yr = this.btnYes.getBoundingClientRect();
+        const origin = { x: yr.left + yr.width / 2, y: yr.top + yr.height / 2 };
+        // stash for explosion origin; fallback in scene5 if missing
+        Kanu._yesOrigin = origin;
+        Kanu._yesRect   = { left: yr.left, top: yr.top, w: yr.width, h: yr.height };
+        Kanu.emit('proposal:yes');
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.whisper.textContent = 'Hehe — I knew it. ❤️';
+          this.whisper.classList.add('is-visible');
+          utils.delay(360).then(() => Director.go(5));
+          return;
+        }
+        const glow = utils.$('.stage__glow');
+        // beat 1 — 0-150ms tactile compress/respond (squash, not just scale)
+        // beat 2 — 150-400 anticipation: surrounding UI reacts, glow shifts
+        // beat 3 — 400+ major transition into scene5
+        const t = gsap.timeline({ onComplete: () => Director.go(5) });
+        // 0-150 tactile compress
+        t.to(this.btnYes, { scaleX: 0.92, scaleY: 0.88, duration: 0.08, ease: 'power3.in' }, 0)
+         .to(this.btnYes, { scaleX: 1.08, scaleY: 1.06, boxShadow: '0 14px 36px rgba(226,84,95,0.52), 0 0 22px rgba(226,84,95,0.32), 0 0 0 1px rgba(244,234,228,0.10) inset', duration: 0.09, ease: 'power2.out' }, 0.08)
+         .to(this.btnYes, { scaleX: 1.0, scaleY: 1.0, duration: 0.18, ease: 'elastic.out(1, 0.55)' }, 0.17)
+         // 150-400 anticipation (surrounding reacts subtly: question/NO fade, glow shift)
+         .to(this.q,        { opacity: 0.58, filter: 'blur(1.5px)', scale: 0.992, duration: 0.22, ease: 'power2.out' }, 0.15)
+         .to(this.btnNo,    { opacity: 0.34, scale: 0.96, filter: 'blur(1px)', duration: 0.22, ease: 'power2.out' }, 0.16)
+         .to(this.eyebrow,  { opacity: 0.55, duration: 0.20, ease: 'power2.out' }, 0.17)
+         .to(glow, { opacity: 1, scale: 1.09, duration: 0.26, ease: 'power2.out' }, 0.14)
+         .to(this.actions,  { scale: 0.998, duration: 0.18, ease: 'power2.out' }, 0.15)
+         // 400+ — major transition commitment (commit to S5)
+         .to(this.btnNo,    { opacity: 0, y: 8, scale: 0.94, duration: 0.20, ease: 'power2.in' }, 0.38)
+         .to(this.actions,  { opacity: 0, duration: 0.18, ease: 'power2.in' }, 0.42)
+         .to(this.q,        { opacity: 0, y: -10, filter: 'blur(8px)', duration: 0.24, ease: 'power2.in' }, 0.44)
+         .to(this.eyebrow,  { opacity: 0, duration: 0.18, ease: 'power2.in' }, 0.44)
+         .to(glow,          { opacity: 0.30, duration: 0.30, ease: 'sine.inOut' }, 0.46);
+        // whisper reveal sits inside the beats (not before)
+        this.whisper.textContent = 'Hehe — I knew it. ❤️';
+        gsap.delayedCall(0.26, () => {
+          this.whisper.classList.add('is-visible');
+          gsap.fromTo(this.whisper, { y: 6, opacity: 0 }, { y: 0, opacity: 1, duration: 0.46, ease: 'power3.out', overwrite: true });
+        });
+      },
+
+      /* ── NO evasion ──────────────────────────────────────────────
+         Choreography, not chaos. Each attempt picks a different
+         movement character; the button never glitches or shrinks,
+         never leaves the safe area, never covers YES.
+         ─────────────────────────────────────────────────────────── */
+      evade(e) {
+        if (this._yesDone) return;
+        this.attempts++;
+
+        const phrases = [
+          'Are you sure? 🥺',
+          'Really? 🥺',
+          'Kanu pls 😭',
+          'Think again 😭',
+          'Socho toh sahi…',
+          'Pakka? 🥺',
+          'Ek baar aur soch lo',
+          'Arre 🥺',
+        ];
+        const msg = phrases[Math.min(this.attempts - 1, phrases.length - 1)];
+        this.showWhisper(msg);
+
+        // haptics where available
+        if (navigator.vibrate) navigator.vibrate(12);
+
+        if (REDUCED.matches) {
+          // reduced-motion: just a gentle nudge, no free roaming
+          if (!HAS_GSAP) return;
+          gsap.fromTo(this.btnNo, { x: -6 }, { x: 6, duration: 0.12, yoyo: true, repeat: 3, ease: 'sine.inOut', onComplete: () => gsap.set(this.btnNo, { x: 0 }) });
+          return;
+        }
+
+        // first dodge: lift out of the flex row into free space
+        if (!this.noFree) this.freeNo();
+
+        // pick a target that feels intentional — away from the pointer,
+        // biased to open space, never overlapping YES
+        const target = this.pickTarget(e);
+        const dur = this.attempts <= 2 ? 0.42 : this.attempts <= 5 ? 0.34 : 0.30;
+        const ease = this.attempts % 3 === 0 ? 'back.out(1.2)' : this.attempts % 2 === 0 ? 'power3.out' : 'power2.out';
+
+        if (!HAS_GSAP) {
+          this.btnNo.style.left = target.x + 'px';
+          this.btnNo.style.top  = target.y + 'px';
+          return;
+        }
+
+        // subtle squash/stretch on the jump — character, not glitch
+        gsap.timeline()
+          .to(this.btnNo, { scaleX: 0.96, scaleY: 1.04, duration: 0.08, ease: 'power2.out' }, 0)
+          .to(this.btnNo, { left: target.x, top: target.y, duration: dur, ease }, 0.04)
+          .to(this.btnNo, { scaleX: 1, scaleY: 1, duration: 0.18, ease: 'power2.out' }, 0.04 + dur - 0.06)
+          .to(this.btnNo, { rotation: 0, duration: 0.22, ease: 'power2.out' }, 0.06);
+
+        // tiny tilt that resolves — adds life without feeling broken
+        const tilt = (Math.random() - 0.5) * (this.attempts > 4 ? 5 : 3);
+        gsap.set(this.btnNo, { rotation: tilt });
+      },
+
+      freeNo() {
+        // Measure true layout size: getBoundingClientRect includes scale/transform
+        // (after S4's commit dims NO to scale 0.94, and after replay the scale may
+        // still be present until S4.play clears it). Use offsetWidth/offsetHeight for
+        // unscaled size and correct the rect origin for visual center-scale.
+        const rScaled = this.btnNo.getBoundingClientRect();
+        const wLayout = this.btnNo.offsetWidth  || Math.round(rScaled.width  / (rScaled.width  ? (rScaled.width  / (parseFloat(getComputedStyle(this.btnNo).width) || rScaled.width)) : 1)) || rScaled.width;
+        const hLayout = this.btnNo.offsetHeight || Math.round(rScaled.height / (rScaled.height ? (rScaled.height / (parseFloat(getComputedStyle(this.btnNo).height) || rScaled.height)) : 1)) || rScaled.height;
+        // fallback when computed width is unreliable — derive from rect + scale if present
+        const cs = getComputedStyle(this.btnNo);
+        const hasScale = cs.transform && cs.transform !== 'none';
+        let rLeft = rScaled.left, rTop = rScaled.top;
+        let w = rScaled.width, h = rScaled.height;
+        if (hasScale) {
+          // offsetWidth is the pre-transform layout box; center-correct the origin
+          w = wLayout; h = hLayout;
+          rLeft = rScaled.left - (w - rScaled.width)  / 2;
+          rTop  = rScaled.top  - (h - rScaled.height) / 2;
+        } else {
+          w = wLayout || rScaled.width; h = hLayout || rScaled.height;
+        }
+        // NOW rLeft/rTop are the layout origin we will pin left/top to
+        this.btnNo.style.width = w + 'px';
+        this.btnNo.style.height = h + 'px';
+        if (!this._reparented) {
+          document.body.appendChild(this.btnNo);
+          this._reparented = true;
+        }
+        this.btnNo.classList.add('is-free');
+        if (HAS_GSAP) {
+          gsap.set(this.btnNo, { x: 0, y: 0, xPercent: 0, yPercent: 0, rotation: 0, scaleX: 1, scaleY: 1 });
+          this.btnNo.style.transform = 'none';
+          gsap.set(this.btnNo, { left: rLeft, top: rTop });
+        } else {
+          this.btnNo.style.left = rLeft + 'px';
+          this.btnNo.style.top  = rTop + 'px';
+          this.btnNo.style.transform = 'none';
+        }
+        this.noFree = true;
+        this.noPos = { x: rLeft, y: rTop };
+        this._noSize = { w, h };
+      },
+
+      pickTarget(e) {
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const margin = 20;
+        const btn = this._noSize || this.btnNo.getBoundingClientRect();
+        const yesR = this.btnYes.getBoundingClientRect();
+        const bw = btn.w ?? btn.width, bh = btn.h ?? btn.height;
+
+        // work in rect-top-left coordinates (because is-free is top-left anchored)
+        const noCx = this.noPos.x + bw / 2;
+        const noCy = this.noPos.y + bh / 2;
+        const px = (e && e.clientX) || noCx;
+        const py = (e && e.clientY) || noCy;
+
+        const candidates = [];
+        const push = (x, y) => candidates.push({ x, y });
+
+        // 1) away from pointer (vector) — emit as top-left
+        {
+          let dx = noCx - px, dy = noCy - py;
+          const len = Math.hypot(dx, dy) || 1;
+          dx /= len; dy /= len;
+          const dist = 110 + Math.min(this.attempts * 10, 60) + Math.random() * 40;
+          push(noCx + dx * dist - bw / 2, noCy + dy * dist - bh / 2);
+        }
+        // 2) orbit: perpendicular to pointer vector
+        {
+          let dx = noCx - px, dy = noCy - py;
+          const len = Math.hypot(dx, dy) || 1;
+          dx /= len; dy /= len;
+          const side = this.attempts % 2 === 0 ? 1 : -1;
+          const dist = 90 + Math.random() * 50;
+          push(noCx + (-dy * side) * dist + dx * 40 - bw / 2, noCy + (dx * side) * dist + dy * 40 - bh / 2);
+        }
+        // 3) safe corners — store as top-left rects (no center offset)
+        {
+          const corners = [
+            { x: margin,               y: margin + 52 },
+            { x: vw - margin - bw,     y: margin + 52 },
+            { x: margin,               y: vh - margin - bh - 56 },
+            { x: vw - margin - bw,     y: vh - margin - bh - 56 },
+          ];
+          const c = corners[this.attempts % corners.length];
+          push(c.x + (Math.random() - 0.5) * 18, c.y + (Math.random() - 0.5) * 14);
+        }
+        // 4) mid-edge drift
+        push(margin + Math.random() * 30, vh * 0.44 + (Math.random() - 0.5) * 56);
+        push(vw - margin - bw - Math.random() * 30, vh * 0.56 + (Math.random() - 0.5) * 56);
+
+        const bwEff = bw + 2, bhEff = bh + 2; // border outside content box
+        const xMin = margin, xMax = vw - margin - bwEff;
+        const yMin = margin + 52, yMax = vh - margin - bhEff - 56;
+        let best = null, bestScore = -Infinity;
+        for (const c of candidates) {
+          const x = utils.clamp(c.x, xMin, xMax);
+          const y = utils.clamp(c.y, yMin, Math.max(yMin + 10, yMax));
+          const cx = x + bw / 2, cy = y + bh / 2;
+          const yesCx = yesR.left + yesR.width / 2, yesCy = yesR.top + yesR.height / 2;
+          const axisOverlap = (Math.abs(cx - yesCx) < (bw + yesR.width) / 2 + 10) && (Math.abs(cy - yesCy) < (bh + yesR.height) / 2 + 10);
+          if (axisOverlap) continue;
+          const dYes = Math.hypot(cx - yesCx, cy - yesCy);
+          if (!axisOverlap && dYes < (bw + yesR.width) / 2 + 22 && Math.abs(cy - yesCy) < 64) continue;
+          const dPtr = Math.hypot(cx - px, cy - py);
+          const dCur = Math.hypot(cx - noCx, cy - noCy);
+          const score = dPtr * 0.9 - dCur * 0.25 + Math.random() * 18;
+          if (score > bestScore) { bestScore = score; best = { x, y }; }
+        }
+        if (!best) best = { x: utils.clamp(vw / 2 - bw / 2 + (Math.random() - 0.5) * 80, xMin, xMax), y: utils.clamp(vh / 2 - bh / 2, yMin, Math.max(yMin + 10, yMax)) };
+        this.noPos = best;
+        return best;
+      },
+
+      clampNo() {
+        if (!this.noFree) return;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const margin = 20;
+        const bw = (this._noSize && this._noSize.w) || this.btnNo.getBoundingClientRect().width;
+        const bh = (this._noSize && this._noSize.h) || this.btnNo.getBoundingClientRect().height;
+        const bwEff = bw + 2, bhEff = bh + 2;
+        const xMin = margin, xMax = vw - margin - bwEff;
+        const yMin = margin + 52, yMax = vh - margin - bhEff - 56;
+        const x = utils.clamp(this.noPos.x, xMin, xMax);
+        const y = utils.clamp(this.noPos.y, yMin, Math.max(yMin + 10, yMax));
+        this.noPos = { x, y };
+        if (HAS_GSAP) gsap.set(this.btnNo, { left: x, top: y });
+        else { this.btnNo.style.left = x + 'px'; this.btnNo.style.top = y + 'px'; }
+      },
+
+      showWhisper(text) {
+        clearTimeout(this._whisperTimer);
+        this.whisper.textContent = text;
+        this.whisper.classList.add('is-visible');
+        if (HAS_GSAP && !REDUCED.matches) {
+          gsap.fromTo(this.whisper, { y: 4 }, { y: 0, duration: 0.36, ease: 'power2.out' });
+        }
+        this._whisperTimer = setTimeout(() => this.whisper.classList.remove('is-visible'), 2200);
+      },
+    };
+
+    /* ================================================================
+       Celebration — scene 5 — cinematic YES climax
+       ---------------------------------------------------------------
+       Derived from the YES button rect (Kanu._yesOrigin).
+       Beats (inside S5):
+         0-280  dark vignette + focal heart appears AT the YES origin
+                (x/y left/top fixed) then tweens to center + elastic scale
+                with glow halo + pulse before burst
+         520    radial flash/glow + primary burst FROM burst origin
+         880    heartbeat micro shake; focal heart collapses
+         ~1350  secondary wave (~40) from same origin
+         2800+  particles settle/fall (gravity/drag/air), opacity falloff;
+                S6 mounts UNDERNEATH with opacity rising — choreographed
+                overlap, not sequential. ~5500-6000 finish.
+       Reduced-motion: scale+fade focal heart only (no particles).
+       Performance: DPR capped, rAF loop, ~220 cap, cull offscreen/alpha.
+       ================================================================ */
+    const scene5 = {
+      mounted: false,
+      _raf: 0,
+      _burstX: 0, _burstY: 0,
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        this.el    = utils.$('#scene-5');
+        this.cvs   = utils.$('#cel-canvas');
+        this.ctx   = this.cvs.getContext('2d');
+        this.heart = utils.$('#cel-heart');
+        this.halo  = utils.$('#cel-halo');
+        this.label = utils.$('#cel-label');
+        this.flash = utils.$('#cel-flash');
+        this.particles = [];
+        // low-end Android often reports DPR 2.5-3 but can't shade at that rate — use 1.5x there, and trim particles
+        this._dpr = (window.devicePixelRatio || 1) > 2 ? 1.5 : Math.min(window.devicePixelRatio || 1, 2);
+        this._onResize = () => { this.resize(); };
+        window.addEventListener('resize', this._onResize);
+        this.el.addEventListener('click', () => { if (this._settled) Director.go(6); });
+      },
+
+      resize() {
+        const w = this.el.offsetWidth || window.innerWidth;
+        const h = this.el.offsetHeight || window.innerHeight;
+        this._w = w; this._h = h;
+        const dpr = this._dpr;
+        this.cvs.width  = Math.round(w * dpr);
+        this.cvs.height = Math.round(h * dpr);
+        this.cvs.style.width  = w + 'px';
+        this.cvs.style.height = h + 'px';
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      },
+
+      // burst origin in CSS pixels relative to viewport -> canvas local
+      // Canvas fills #scene-5 which is absolute inset:0 (viewport-sized).
+      // So viewport origin == canvas local when stage is viewport-sized.
+      deriveOrigin() {
+        const o = Kanu._yesOrigin;
+        if (o && Number.isFinite(o.x) && Number.isFinite(o.y)) {
+          // clamp to safe viewport band (avoids degenerate origin when YES was dodged)
+          const x = utils.clamp(o.x, 24, window.innerWidth - 24);
+          const y = utils.clamp(o.y, 56, window.innerHeight - 64);
+          return { x, y };
+        }
+        // fallback dead-center (only when arriving without S4)
+        return { x: this._w / 2, y: this._h * 0.48 };
+      },
+
+      play() {
+        this.el.hidden = false;
+        this._settled = false; this._ended = false;
+        this._s6Mounted = false;
+        this.particles.length = 0;
+        this.el.classList.add('is-active');
+        this.resize();
+        const veil = utils.$('#veil');
+        if (HAS_GSAP) gsap.set(veil, { opacity: 0 });
+        const s4 = utils.$('#scene-4');
+        if (s4) { s4.hidden = true; s4.classList.remove('is-active'); }
+        if (HAS_GSAP) gsap.set([this.el, this.heart, this.label, this.flash, this.halo], { clearProps: 'all' });
+        this.el.classList.add('is-active');
+        const stage = utils.$('#stage');
+        stage.style.background = 'var(--ink)';
+        if (HAS_GSAP) gsap.set(this.el, { opacity: 1 });
+
+        if (REDUCED.matches) { this.playReduced(); return; }
+        if (!HAS_GSAP) { this.explodePlain(); this.finishSoon(1800); return; }
+
+        const glow = utils.$('.stage__glow');
+        const origin = this.deriveOrigin();
+        // keep for particle bursts (canvas local == viewport when S5 fills viewport)
+        // if S5 had offset, adjust; here it's absolute inset:0 so direct.
+        this._burstX = origin.x;
+        this._burstY = origin.y;
+
+        // focal heart starts exactly at burst origin (fixed positioning)
+        // then GSAP will morph its left/top to center while scaling — elastic reveal
+        const cx = this._w / 2, cy = this._h * 0.46;
+        gsap.set(this.heart, { left: origin.x, top: origin.y, xPercent: -50, yPercent: -50, x: 0, y: 0, opacity: 0, scale: 0.18, rotation: 0 });
+        gsap.set(this.halo,  { left: origin.x, top: origin.y, xPercent: -50, yPercent: -50, x: 0, y: 0, opacity: 0, scale: 0.35 });
+        gsap.set(this.label, { opacity: 0, y: 10 });
+        gsap.set(this.flash, { opacity: 0 });
+        gsap.set(glow, { opacity: 0.30 });
+
+        const tl = gsap.timeline();
+
+        // 0-320: vignette tightens (stage darkens) + momentum from S4 cut
+        tl.to(stage, { backgroundColor: '#040202', duration: 0.34, ease: 'power2.inOut' }, 0)
+          .to(glow, { opacity: 0.55, scale: 1.02, duration: 0.28, ease: 'sine.inOut' }, 0.06)
+
+          // 120-420: focal heart appears AT YES origin (elastic, glow halo blooms)
+          .to(this.heart, { opacity: 1, scale: 0.96, duration: 0.34, ease: 'elastic.out(1, 0.62)' }, 0.12)
+          .to(this.halo,  { opacity: 0.95, scale: 1.0, duration: 0.30, ease: 'power2.out' }, 0.14)
+          .to(this.flash, { opacity: 0.9, duration: 0.18, ease: 'power2.out' }, 0.16)
+          .to(this.flash, { opacity: 0, duration: 0.28, ease: 'power2.in' }, 0.34)
+
+          // 280-560: focal heart drifts FROM YES origin TO center (power2, not linear) + grows
+          // x/y are GSAP transforms; left/top stay at origin — motion is x/y offset to center
+          .to(this.heart, { x: cx - origin.x, y: cy - origin.y, scale: 1.18, duration: 0.42, ease: 'power3.inOut' }, 0.28)
+          .to(this.halo,  { x: cx - origin.x, y: cy - origin.y, scale: 1.06, duration: 0.42, ease: 'power3.inOut' }, 0.28)
+          .to(glow, { opacity: 1, scale: 1.12, duration: 0.36, ease: 'power2.out' }, 0.30)
+
+          // 560-860: pulse before burst — scale + blur/shadow throb (stagger of breath)
+          .to(this.heart, { scale: 1.28, duration: 0.16, ease: 'power2.in' }, 0.56)
+          .to(this.halo,  { scale: 1.18, opacity: 1, duration: 0.16, ease: 'power2.in' }, 0.56)
+          .to(this.heart, { scale: 1.42, duration: 0.12, ease: 'power2.out' }, 0.72)
+          .to(this.halo,  { scale: 1.28, duration: 0.12, ease: 'power2.out' }, 0.72)
+
+          // 860-880: BURST — radial flash, burst FROM origin, focal collapses; micro shake
+          .add(() => { this.explode(0); this.startLoop(); }, 0.86)
+          .to(this.flash, { opacity: 1, duration: 0.08, ease: 'power2.out' }, 0.86)
+          .to(this.flash, { opacity: 0, duration: 0.42, ease: 'power2.in' }, 0.94)
+          .to(this.heart, { scale: 1.06, opacity: 0, duration: 0.46, ease: 'power3.in' }, 0.88)
+          .to(this.halo,  { scale: 1.55, opacity: 0, duration: 0.42, ease: 'power2.in' }, 0.88)
+          .to(glow, { opacity: 0.32, duration: 0.46, ease: 'sine.inOut' }, 0.90)
+          .to(stage, { x: 1.4, duration: 0.05, yoyo: true, repeat: 5, ease: 'sine.inOut' }, 0.88)
+          .set(stage, { x: 0 }, 1.20)
+
+          // 1350: secondary wave (~40) from same origin, slightly warmer bias
+          .add(() => { this.explode(1); }, 1.35)
+
+          // 2200-6000: settling is owned by the rAF loop (gravity/drag) while we
+          // choreograph S6 reveal OVERLAPPING the particle fade — not sequential.
+          // Particles start fading at ~2.8s (alpha falloff in update); S6 rises
+          // from underneath at ~2.9-3.2s so the letter is discovered through the snow.
+          .add(() => { this.mountS6Underneath(); }, 2.85)
+          .to(stage, { backgroundColor: '#0A0608', duration: 0.95, ease: 'power2.inOut' }, 2.85)
+
+          // completion — settled flag allows tap to advance; label is optional garnish
+          .add(() => {
+            this._settled = true;
+            if (HAS_GSAP) gsap.to(this.label, { opacity: 1, y: 0, duration: 0.42, ease: 'power2.out' });
+            else this.label.style.opacity = 1;
+          }, 3.6)
+          .add(() => this.finish(0.55), 5.7);
+
+        this._finishTimer = setTimeout(() => { if (!this._ended) this.finish(0.45); }, 6400);
+      },
+
+      // mount S6 underneath the celebration canvas with rising opacity — the
+      // choreographic bridge between explosion and message. S5's canvas stays
+      // on top, gradually clearing via particle alpha; S6 is visible through it.
+      mountS6Underneath() {
+        if (this._s6Mounted) return;
+        this._s6Mounted = true;
+        const s6 = Kanu.scenes.get(6);
+        if (!s6) return;
+        try { s6.mount(); } catch(e){ console.error(e); }
+        const el = utils.$('#scene-6');
+        if (!el) return;
+        el.hidden = false;
+        el.classList.add('is-active');
+        el.scrollTop = 0;
+        // start invisible underneath S5
+        if (HAS_GSAP) {
+          gsap.set(el, { opacity: 0 });
+          const inner = utils.$('#scene-6 .finalmsg__inner');
+          if (inner) gsap.set(inner, { y: 10 });
+          gsap.to(el, { opacity: 1, duration: 0.9, ease: 'power2.out' });
+          if (inner) gsap.to(inner, { y: 0, duration: 0.85, ease: 'power3.out', delay: 0.12 });
+        } else {
+          el.style.opacity = 1;
+        }
+        // let S6 own its full entrance once S5 hands off (stagger inside S6.play)
+        // but keep S6's entrance subtle here — S5 will fade, then S6.play refines.
+        try { s6.play(); } catch(e){ console.error(e); }
+        // veil is underneath both; keep it hidden during overlap
+        const veil = utils.$('#veil');
+        if (HAS_GSAP && veil) gsap.set(veil, { opacity: 0 });
+        // Director now considers S6 current once S5 finishes its veil; pre-set
+        // busy so stray taps don't race the handoff. Director.go(6) at finish will finalize.
+        Director.busy = true;
+        // HUD will be updated at finish(); pre-stage it
+        const stage = utils.$('#stage');
+        stage.dataset.scene = '6';
+        const hudNum = stage.querySelector('.stage__hud span:last-child');
+        if (hudNum) hudNum.innerHTML = `<i class="rec" aria-hidden="true"></i>${Director.hudFor(6)}`;
+      },
+
+      playReduced() {
+        // reduced-motion: scale+fade only (no particles), then handoff to S6
+        const s = utils.$('#stage');
+        const glow = utils.$('.stage__glow');
+        if (HAS_GSAP) {
+          const origin = this.deriveOrigin();
+          const cx = this._w / 2, cy = this._h * 0.46;
+          gsap.set(this.heart, { left: origin.x, top: origin.y, xPercent: -50, yPercent: -50, x: 0, y: 0, opacity: 0, scale: 0.62 });
+          gsap.set(this.halo,  { left: origin.x, top: origin.y, xPercent: -50, yPercent: -50, x: 0, y: 0, opacity: 0, scale: 0.6 });
+          gsap.set(this.label, { opacity: 0, y: 6 });
+          gsap.timeline({ onComplete: () => { this._settled = true; this.finish(0.5); } })
+            .to(s, { backgroundColor: '#050203', duration: 0.3 }, 0)
+            .to(this.heart, { opacity: 1, scale: 0.88, duration: 0.42, ease: 'back.out(1.2)' }, 0.14)
+            .to(this.halo,  { opacity: 0.9, scale: 1.0, duration: 0.32 }, 0.14)
+            .to(this.heart, { x: cx - origin.x, y: cy - origin.y, scale: 1.04, duration: 0.6, ease: 'power3.inOut' }, 0.36)
+            .to(this.halo,  { x: cx - origin.x, y: cy - origin.y, scale: 1.02, duration: 0.6, ease: 'power3.inOut' }, 0.36)
+            .to(this.label, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.82)
+            .to(glow,       { opacity: 1, scale: 1.06, duration: 0.5 }, 0.2)
+            .to(this.heart, { scale: 1.07, duration: 0.26, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.96);
+        } else {
+          this.heart.style.opacity = 1; this.heart.style.transform = 'translate(-50%,-50%) scale(1)';
+          this.label.style.opacity = 1;
+          this._settled = true;
+          this.finishSoon(900);
+        }
+      },
+
+      explode(wave) {
+        const cx = this._burstX || this._w / 2;
+        const cy = this._burstY || this._h * 0.48;
+        const colors = ['#7A1E3D', '#A1324F', '#E2545F', '#3C0E1E', '#D4838F', '#F4EAE4'];
+        const weights = [0.28, 0.18, 0.16, 0.12, 0.14, 0.12];
+        const pickColor = () => {
+          const r = Math.random(); let a = 0;
+          for (let i = 0; i < weights.length; i++) { a += weights[i]; if (r < a) return colors[i]; }
+          return colors[0];
+        };
+        const isPrimary = wave === 0;
+        // spec: primary ~120 hearts + ~60 dots, secondary ~40 total
+        // burst origin is the YES button's center (or center fallback) — not dead-center unless fallback
+        const _lowEnd = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (this._dpr <= 1.5);
+        const _lens = _lowEnd ? 0.68 : 1;
+        const nHearts  = Math.round((isPrimary ? (118 + Math.floor(Math.random() * 18)) : (22 + Math.floor(Math.random() * 14))) * _lens);
+        const nCircles = Math.round((isPrimary ? (60  + Math.floor(Math.random() * 22)) : (16 + Math.floor(Math.random() * 12))) * _lens);
+        // depth tiers: near (large, fast) / mid / far (small, slow) — parallax via size/speed/alpha
+        const depthFor = () => {
+          const r = Math.random();
+          if (r < 0.20) return 0; // near
+          if (r < 0.62) return 1; // mid
+          return 2;               // far
+        };
+        const pushHeart = () => {
+          let ang = Math.random() * Math.PI * 2;
+          // slight angular jitter so radial isn't mechanically uniform
+          ang += (Math.random() - 0.5) * 0.14;
+          const d = depthFor();
+          // speed/size tied to depth for parallax: near is larger+slightly faster
+          const spBase = isPrimary ? 340 : 210;
+          const spVar  = isPrimary ? 420 : 260;
+          const speed  = (spBase + Math.random() * spVar) * (d === 0 ? 1.12 : d === 2 ? 0.86 : 1.0);
+          let sz;
+          if (d === 0) sz = isPrimary ? (17 + Math.random() * 11) : (12 + Math.random() * 9);
+          else if (d === 2) sz = isPrimary ? (8.5 + Math.random() * 5.5) : (6 + Math.random() * 4);
+          else sz = isPrimary ? (11 + Math.random() * 8) : (8 + Math.random() * 6);
+          const vr = (Math.random() - 0.5) * (d === 2 ? 360 : 760);
+          const alpha = d === 2 ? (0.52 + Math.random() * 0.18) : d === 0 ? (0.96 + Math.random() * 0.04) : (0.84 + Math.random() * 0.10);
+          // speed variance sets trail length; color with flare bias on near
+          const col = d === 0 && Math.random() < 0.18 ? '#E2545F' : pickColor();
+          this.particles.push({
+            kind: 'heart', x: cx, y: cy,
+            vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed - (isPrimary ? (d === 0 ? 72 : 46) : 18),
+            sz, rot: (Math.random() - 0.5) * (d === 2 ? 34 : 68), vr,
+            t: 0, alpha, color: col, depth: d,
+            gravity: (d === 2 ? 300 : d === 0 ? 420 : 368) + Math.random() * 110,
+            drag: 0.995 - Math.random() * 0.024 - (d === 2 ? 0.004 : 0),
+            spinDrag: 0.998,
+          });
+        };
+        const pushDot = () => {
+          let ang = Math.random() * Math.PI * 2;
+          ang += (Math.random() - 0.5) * 0.16;
+          const d = depthFor();
+          const sp = (isPrimary ? (250 + Math.random() * 380) : (170 + Math.random() * 250)) * (d === 2 ? 0.84 : d === 0 ? 1.10 : 1.0);
+          let sz;
+          if (d === 0) sz = isPrimary ? (4.2 + Math.random() * 3.8) : (3.0 + Math.random() * 2.2);
+          else if (d === 2) sz = isPrimary ? (1.6 + Math.random() * 1.6) : (1.4 + Math.random() * 1.0);
+          else sz = isPrimary ? (2.6 + Math.random() * 2.4) : (2.0 + Math.random() * 1.6);
+          // bokeh orbs: soft, some larger+diffused (alpha carries the bloom)
+          const isBokeh = Math.random() < 0.30;
+          const alpha = isBokeh ? (0.34 + Math.random() * 0.18) : (0.62 + Math.random() * 0.20);
+          this.particles.push({
+            kind: 'dot', x: cx, y: cy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+            sz: isBokeh ? sz * 1.35 : sz, t: 0, alpha, color: pickColor(), depth: d,
+            gravity: 210 + Math.random() * 140, drag: 0.992 + Math.random() * 0.006,
+            bokeh: isBokeh,
+          });
+        };
+        for (let i = 0; i < nHearts; i++)  pushHeart();
+        for (let i = 0; i < nCircles; i++) pushDot();
+      },
+
+      explodePlain() {
+        const o = this.deriveOrigin();
+        gsap.set(this.heart, { left: o.x, top: o.y, xPercent: -50, yPercent: -50, x: 0, y: 0 });
+        this.heart.style.opacity = 1;
+        this.heart.style.transform += ' scale(1.05)';
+      },
+
+      startLoop() {
+        if (this._raf) cancelAnimationFrame(this._raf);
+        this._t0 = performance.now();
+        this._lastT = this._t0;
+        const tick = (now) => {
+          const dt = Math.min(0.033, (now - this._lastT) / 1000);
+          this._lastT = now;
+          this.update(dt, (now - this._t0) / 1000);
+          this.draw();
+          const elapsed = (now - this._t0) / 1000;
+          if (elapsed < 5.9) this._raf = requestAnimationFrame(tick);
+          else { this._raf = 0; this.particles.length = 0; this.draw(); }
+        };
+        this._raf = requestAnimationFrame(tick);
+      },
+
+      update(dt, elapsed) {
+        const w = this._w, h = this._h;
+        for (const p of this.particles) {
+          p.t += dt;
+          // physics: gravity + drag (air resistance) — depth modulates drag
+          p.vy += p.gravity * dt;
+          // slight lateral wobble for organic fall (tiny, transform-only)
+          if (p.kind === 'heart' && p.t > 0.6) p.vx += Math.sin(p.t * 1.7 + p.rot * 0.02) * dt * 6;
+          p.vx *= p.drag; p.vy *= p.drag;
+          p.x  += p.vx * dt; p.y  += p.vy * dt;
+          if (p.kind === 'heart') {
+            p.rot += p.vr * dt * (p.spinDrag ?? 1);
+            if (p.vr) p.vr *= 0.996;
+            // opacity falloff: hold → gentle → clear as they settle
+            if (p.t > 3.4) p.alpha = Math.max(0, p.alpha - dt * (p.depth === 2 ? 0.72 : 0.58));
+            else if (p.t > 2.0) p.alpha = Math.max(p.depth === 2 ? 0.14 : 0.22, p.alpha - dt * 0.11);
+            else if (elapsed > 2.8 && p.alpha > 0.92) p.alpha = Math.max(0.88, p.alpha - dt * 0.08);
+          } else {
+            if (p.t > 1.35) p.alpha = Math.max(0, p.alpha - dt * (p.bokeh ? 0.52 : 0.68));
+            else if (elapsed > 2.8) p.alpha = Math.max(0.08, p.alpha - dt * 0.06);
+          }
+        }
+        // cull: offscreen or alpha ~0; cap total to ~220 with preference for visible depth
+        let keep = 0;
+        for (let i = 0; i < this.particles.length; i++) {
+          const p = this.particles[i];
+          const alive = p.alpha > 0.015 && p.y > -80 && p.y < h + 90 && p.x > -90 && p.x < w + 90;
+          if (alive) this.particles[keep++] = p;
+        }
+        this.particles.length = keep;
+        // hard cap ~220 (spec) — keep highest alpha (most visible) across depths
+        if (this.particles.length > 220) {
+          this.particles.sort((a, b) => b.alpha - a.alpha);
+          this.particles.length = 220;
+        }
+      },
+
+      heartPath(ctx, s) {
+        // organic heart via two arcs + tip — uses quadratic variety so repeats don't read identically
+        const w = s, h = s * 0.92;
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.28);
+        ctx.bezierCurveTo(w * 0.58, -h * 0.72,  w * 1.18, h * 0.22,  0, h * 0.98);
+        ctx.bezierCurveTo(-w * 1.18, h * 0.22, -w * 0.58, -h * 0.72, 0, h * 0.28);
+        ctx.closePath();
+      },
+
+      draw() {
+        const ctx = this.ctx, w = this._w, h = this._h;
+        ctx.clearRect(0, 0, w, h);
+        // depth sort: far first so near overlaps (parallax layering)
+        // cheap: stable-ish by size so we avoid per-frame sort cost when under cap
+        // only sort when we had to recently or when far/near overlap matters
+        // — do a light depth-bucket draw instead of full sort for 60fps
+        for (let pass = 2; pass >= 0; pass--) {
+          for (const p of this.particles) {
+            if ((p.depth ?? 1) !== pass) continue;
+            if (p.alpha <= 0.015) continue;
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.translate(p.x, p.y);
+            if (p.kind === 'heart') {
+              ctx.rotate((p.rot * Math.PI) / 180);
+              // per-particle organic scale jitter (tiny) — breaks identical repeats
+              const j = 1 + Math.sin(p.t * 2.3 + p.rot * 0.015) * 0.04;
+              const sc = (p.sz / 22) * j;
+              ctx.scale(sc, sc);
+              this.heartPath(ctx, 22);
+              ctx.fillStyle = p.color;
+              // depth-aware glow: far is softer, near is hotter
+              const d = p.depth ?? 1;
+              ctx.shadowColor = p.color === '#F4EAE4' ? 'rgba(244,234,228,0.42)' : d === 2 ? 'rgba(122,30,61,0.22)' : 'rgba(226,84,95,0.48)';
+              ctx.shadowBlur = p.sz * (d === 2 ? 0.35 : d === 0 ? 0.68 : 0.55);
+              ctx.fill();
+            } else {
+              ctx.beginPath();
+              // bokeh orbs are slightly elliptical with stronger blur
+              const rx = p.sz, ry = p.bokeh ? p.sz * 0.92 : p.sz;
+              if (p.bokeh) {
+                ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+              } else {
+                ctx.arc(0, 0, p.sz, 0, Math.PI * 2);
+              }
+              ctx.fillStyle = p.color;
+              ctx.shadowColor = p.bokeh ? 'rgba(244,234,228,0.18)' : 'rgba(122,30,61,0.35)';
+              ctx.shadowBlur = p.sz * (p.bokeh ? 2.2 : 1.2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+        }
+      },
+
+      finish(dur) {
+        if (this._ended) return;
+        this._ended = true;
+        clearTimeout(this._finishTimer);
+        if (this._raf) { cancelAnimationFrame(this._raf); this._raf = 0; }
+        // if overlap already mounted S6, just fade out celebration gracefully —
+        // S6 is underneath and already driving its own entrance.
+        if (this._s6Mounted) {
+          const el6 = utils.$('#scene-6');
+          // ensure Director is coherent even if finish is called twice
+          Director.busy = false;
+          Director.current = 6;
+          const done = () => {
+            this.el.classList.remove('is-active');
+            this.el.hidden = true;
+            this.el.style.opacity = '';
+            // halo/heart fixed nodes hide with the section
+            if (HAS_GSAP) { gsap.set([this.heart, this.halo], { clearProps: 'transform,opacity' }); this.heart.style.opacity = ''; this.halo.style.opacity = ''; }
+          };
+          if (!HAS_GSAP || REDUCED.matches) { this.el.style.opacity = 0; setTimeout(done, 320); return; }
+          const tl = gsap.timeline({ onComplete: done });
+          tl.to(this.el, { opacity: 0, duration: Math.max(0.42, dur), ease: 'power2.inOut' }, 0);
+          // no veil cut — we're already inside S6
+          return;
+        }
+        const veil = utils.$('#veil');
+        const done = () => {
+          this.el.classList.remove('is-active');
+          this.el.hidden = true;
+          try { Director.go(6); } catch(e){ console.error(e); }
+        };
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.el.style.opacity = 0;
+          done(); return;
+        }
+        const tl = gsap.timeline({ onComplete: done });
+        tl.to(this.el, { opacity: 0, duration: Math.max(0.38, dur), ease: 'power2.inOut' }, 0)
+          .to(veil, { opacity: 1, duration: 0.18, ease: 'power2.in' }, 0.06)
+          .to(veil, { opacity: 0, duration: 0.36, ease: 'power2.out' }, 0.26);
+      },
+
+      finishSoon(ms) {
+        setTimeout(() => this.finish(0.5), ms);
+      },
+
+      exit(done) { this.finish(0.36); if (done) setTimeout(done, 560); },
+    };
+
+    /* ----------------------------------------------------------------
+       Final message — scene 6  (VERBATIM Hinglish)
+       ---------------------------------------------------------------- */
+    const scene6 = {
+      mounted: false,
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        this.el     = utils.$('#scene-6');
+        this.mast   = utils.$('#fm-mast');
+        this.kicker = utils.$('#fm-kicker');
+        this.lede   = utils.$('#fm-lede');
+        this.p1     = utils.$('#fm-p1');
+        this.p2     = utils.$('#fm-p2');
+        this.p3     = utils.$('#fm-p3');
+        this.rule   = utils.$('#fm-rule');
+        this.signoff= utils.$('#fm-signoff');
+        this.hint   = utils.$('#fm-hint');
+        this.el.addEventListener('click', () => { if (this._hintOn) Director.go(7); });
+      },
+      play() {
+        this.el.hidden = false;
+        this._hintOn = false;
+        const all = [this.mast, this.kicker, this.lede, this.p1, this.p2, this.p3, this.rule, this.signoff, this.hint].filter(Boolean);
+        if (HAS_GSAP) gsap.set(all, { clearProps: 'all' });
+        this.el.classList.add('is-active');
+        this.el.scrollTop = 0;
+        const veil = utils.$('#veil');
+        if (HAS_GSAP) { gsap.set(veil, { opacity: 0 }); gsap.set(this.el, { opacity: 1 }); }
+
+        if (!HAS_GSAP || REDUCED.matches) {
+          for (const n of [this.mast, this.kicker, this.lede, this.p1, this.p2, this.p3, this.signoff].filter(Boolean)) { if(n){ n.style.opacity = 1; n.style.transform='none'; n.style.filter='none'; } }
+          this.rule.style.opacity = 1; this.rule.style.transform='scaleX(1)';
+          this.hint.style.opacity = 1;
+          this._hintOn = true;
+          return;
+        }
+
+        // editorial letter reveal — discovered through settling snow, not sequential slides
+        // mast + kicker arrive together (letterhead), lede follows, then paragraphs breathe in
+        gsap.set(this.mast,   { opacity: 0, y: 6 });
+        gsap.set(this.kicker, { opacity: 0, y: 8 });
+        gsap.set(this.lede,   { opacity: 0, y: 6 });
+        gsap.set([this.p1, this.p2, this.p3], { opacity: 0, y: 14, filter: 'blur(5px)' });
+        gsap.set(this.rule,   { opacity: 0, scaleX: 0.55 });
+        gsap.set(this.signoff,{ opacity: 0, y: 6 });
+        gsap.set(this.hint,   { opacity: 0, y: 6 });
+
+        const tl = gsap.timeline();
+        // letterhead blooms first — like the paper being found
+        tl.to(this.mast,   { opacity: 1, y: 0, duration: 0.65, ease: 'power2.out' }, 0.18)
+          .to(this.kicker, { opacity: 1, y: 0, duration: 0.62, ease: 'power3.out' }, 0.30)
+          .to(this.lede,   { opacity: 1, y: 0, duration: 0.60, ease: 'power2.out' }, 0.48)
+          // paragraphs: blur-clear + gentle lift, with a breath between each
+          .to(this.p1,     { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.72, ease: 'power3.out' }, 0.72)
+          .to(this.p2,     { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.72, ease: 'power3.out' }, 1.42)
+          .to(this.p3,     { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.72, ease: 'power3.out' }, 2.08)
+          .to(this.rule,   { opacity: 1, scaleX: 1, duration: 0.55, ease: 'power2.inOut' }, 2.72)
+          .to(this.signoff,{ opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' }, 2.86)
+          .to(this.hint,   { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' }, 3.14);
+        tl.eventCallback('onComplete', () => {
+          this._hintOn = true;
+          const hearts = this.el.querySelectorAll('.heart');
+          if (hearts.length) gsap.fromTo(hearts, { scale: 0.88 }, { scale: 1, duration: 0.44, ease: 'back.out(1.5)', stagger: 0.055 });
+          // hairline emphasis wash — hl spans shimmer in after the words settle
+          const hls = this.el.querySelectorAll('.hl');
+          if (hls.length) gsap.fromTo(hls, { opacity: 0.85 }, { opacity: 1, duration: 0.5, ease: 'power2.out', stagger: 0.10 });
+        });
+      },
+      exit(done) {
+        const next = done || (() => Director.go(7));
+        if (!HAS_GSAP || REDUCED.matches) { this.el.hidden = true; this.el.classList.remove('is-active'); next(); return; }
+        const veil = utils.$('#veil');
+        const tl = gsap.timeline({ onComplete: () => { this.el.hidden = true; this.el.classList.remove('is-active'); next(); } });
+        tl.to(this.el, { opacity: 0, y: -8, duration: 0.42, ease: 'power2.in' }, 0)
+          .to(veil, { opacity: 1, duration: 0.18, ease: 'power2.in' }, 0.14)
+          .to(veil, { opacity: 0, duration: 0.36, ease: 'power2.out' }, 0.32);
+      },
+    };
+
+    /* ----------------------------------------------------------------
+       Forever — scene 7
+       ---------------------------------------------------------------- */
+    const scene7 = {
+      mounted: false,
+      mount() {
+        if (this.mounted) return;
+        this.mounted = true;
+        this.el     = utils.$('#scene-7');
+        this.heart  = utils.$('#fv-heart');
+        this.line   = utils.$('#fv-line');
+        this.sub    = utils.$('#fv-sub');
+        this.replay = utils.$('#fv-replay');
+        const goReplay = () => this.replayAll();
+        this.replay.addEventListener('click', (e) => { e.stopPropagation(); goReplay(); });
+        this.el.addEventListener('click', goReplay);
+      },
+      play() {
+        this.el.hidden = false;
+        if (HAS_GSAP) gsap.set([this.line, this.sub, this.replay, this.heart], { clearProps: 'all' });
+        this.el.classList.add('is-active');
+        const veil = utils.$('#veil');
+        if (HAS_GSAP) gsap.set(veil, { opacity: 0 });
+        if (HAS_GSAP) gsap.set(this.el, { opacity: 1 });
+        try { localStorage.setItem('proposal_completed', String(Date.now())); } catch(e) {}
+
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.heart.style.opacity = 1;
+          this.line.style.opacity = 1; this.line.style.transform='none';
+          this.sub.style.opacity = 1;
+          this.replay.style.opacity = 1;
+          return;
+        }
+        gsap.set(this.heart, { scale: 0.82, opacity: 0 });
+        gsap.set(this.line,  { opacity: 0, y: 10 });
+        gsap.set(this.sub,   { opacity: 0, y: 6 });
+        gsap.set(this.replay,{ opacity: 0, y: 6 });
+        const tl = gsap.timeline();
+        tl.to(this.heart, { scale: 1, opacity: 1, duration: 0.55, ease: 'back.out(1.35)' }, 0.18)
+          .to(this.line,  { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.52)
+          .to(this.sub,   { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.82)
+          .to(this.replay,{ opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, 1.6);
+      },
+      replayAll() {
+        if (this._replaying) return;
+        this._replaying = true;
+        try {
+          const n = parseInt(localStorage.getItem('replay_count') || '0', 10) || 0;
+          localStorage.setItem('replay_count', String(n + 1));
+        } catch(e) {}
+        // return any reparented NO to the proposal actions row and reset its state
+        try {
+          const no = document.getElementById('btn-no');
+          const actions = document.getElementById('s4-actions');
+          if (no && actions && no.parentElement === document.body) {
+            no.classList.remove('is-free', 'is-shy');
+            no.style.left = ''; no.style.top=''; no.style.width=''; no.style.height=''; no.style.transform='';
+            if (HAS_GSAP) gsap.set(no, { clearProps: 'all' });
+            actions.appendChild(no);
+          }
+        } catch(e) {}
+        // reset scene flags so a second run doesn't short-circuit
+        [scene1, scene2, scene3, scene5, scene6].forEach(s => {
+          s.mounted = false; // allow mount to re-bind if needed (guarded)
+          s._exitDone = false; s.exiting = false; s.exiting = false;
+          s._yesDone = false; s._settled = false; s._ended = false;
+          if (s._raf) { cancelAnimationFrame(s._raf); s._raf = 0; }
+          clearTimeout(s._finishTimer);
+        });
+        scene4._yesDone = false; scene4.attempts = 0; scene4.noFree = false; scene4.noPos = { x: 0, y: 0 }; scene4._reparented = false; scene4._noSize = null;
+        const w = document.getElementById('s4-whisper'); if (w) { w.textContent=''; w.classList.remove('is-visible'); }
+        const s4el = document.getElementById('scene-4'); if (s4el) { s4el.hidden = true; s4el.classList.remove('is-active'); s4el.style.opacity=''; }
+        const s5el = document.getElementById('scene-5'); if (s5el) { s5el.hidden = true; s5el.classList.remove('is-active'); s5el.style.opacity=''; }
+        const s6el = document.getElementById('scene-6'); if (s6el) { s6el.hidden = true; s6el.classList.remove('is-active'); s6el.style.opacity=''; }
+        this.el.classList.remove('is-active');
+        // fade to black then reboot from S1
+        const stage = utils.$('#stage'), veil = utils.$('#veil');
+        if (!HAS_GSAP || REDUCED.matches) {
+          this.el.hidden = true; this._replaying = false;
+          stage.dataset.scene = '1';
+          const hudNum = stage.querySelector('.stage__hud span:last-child');
+          if (hudNum) hudNum.innerHTML = `<i class="rec" aria-hidden="true"></i>${Director.hudFor(1)}`;
+          const c = document.getElementById('content'); if (c) c.style.opacity='';
+          const hit = document.getElementById('hit'); if (hit) hit.classList.remove('is-hidden');
+          scene1.mounted = false; scene1.exiting = false; scene1.ready = false;
+          scene1.mount(); scene1.play();
+          Director.current = 1; Director.busy = false;
+          Kanu.emit('scene:changed', { from: 7, to: 1 });
+          return;
+        }
+        const tl = gsap.timeline({ onComplete: () => {
+          this.el.hidden = true; this._replaying = false;
+          stage.dataset.scene = '1';
+          const hudNum = stage.querySelector('.stage__hud span:last-child');
+          if (hudNum) hudNum.innerHTML = `<i class="rec" aria-hidden="true"></i>${Director.hudFor(1)}`;
+          const c = document.getElementById('content'); if (c) { c.style.opacity=''; gsap.set(c, { clearProps: 'opacity' }); }
+          const hit2 = document.getElementById('hit'); if (hit2) hit2.classList.remove('is-hidden');
+          scene1.mounted = false; scene1.exiting = false; scene1.ready = false;
+          scene1.mount(); scene1.play();
+          Director.current = 1; Director.busy = false;
+          Kanu.emit('scene:changed', { from: 7, to: 1 });
+        }});
+        tl.to(this.el, { opacity: 0, duration: 0.42, ease: 'power2.in' }, 0)
+          .to(veil, { opacity: 1, duration: 0.22, ease: 'power2.in' }, 0.16)
+          .to(stage, { backgroundColor: '#0A0608', duration: 0.2 }, 0.2)
+          .to(veil, { opacity: 0, duration: 0.40, ease: 'power2.out' }, 0.40);
+      },
+      exit(done){ if (done) done(); },
+    };
+
+    /* ----------------------------------------------------------------
+       Scene registry + pub/sub
+       ---------------------------------------------------------------- */
+    const scenes = new Map();
+
+    const Kanu = {
+      scenes,
+      Director,
+      registerScene(id, mod) { scenes.set(id, mod); },
+      emit(event, detail) {
+        window.dispatchEvent(new CustomEvent(`kanu:${event}`, { detail }));
+      },
+    };
+
+    Kanu.registerScene(1, scene1);
+    Kanu.registerScene(2, scene2);
+    Kanu.registerScene(3, scene3);
+    Kanu.registerScene(4, scene4);
+    Kanu.registerScene(5, scene5);
+    Kanu.registerScene(6, scene6);
+    Kanu.registerScene(7, scene7);
+
+    global.Kanu = Kanu;
+
+    /* ----------------------------------------------------------------
+       Boot
+       ---------------------------------------------------------------- */
+    document.addEventListener('DOMContentLoaded', () => {
+      // one global keyboard advance — keeps S2/S3/S6/S7 operable without aria button on sections
+      // respects reduced-motion: does not interfere with tab order; Enter/Space advances only when the settled hint is visible
+      const isTapSurface = () => {
+        const d = Director.current;
+        if (d === 2) return !!scene2.ready && !scene2._exitDone;
+        if (d === 3) return !!scene3.ready && !scene3.exiting;
+        if (d === 6) return !!scene6._hintOn;
+        if (d === 7) return true;
+        return false;
+      };
+      const atMap = { 2: 3, 3: 4, 6: 7, 7: 'replay' };
+      document.addEventListener('keydown', (e) => {
+        const isAdvance = e.key === 'Enter' || e.key === ' ';
+        if (!isAdvance) return;
+        // never steal from real controls / typing surfaces
+        const t = e.target;
+        if (t && (t.closest && (t.closest('button') || t.closest('[contenteditable="true"]') || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT'))) return;
+        if (!isTapSurface()) return;
+        e.preventDefault();
+        const d = Director.current;
+        if (d === 7) scene7.replayAll();
+        else Director.go(atMap[d]);
+      });
+      scene1.mount();
+      scene1.play();
+    });
+
+    // legacy seam: scene:rest now routes through Director
+    window.addEventListener('kanu:scene:rest', () => Director.go(2));
+  })(window);
+  </script>
+</body>
+</html>
